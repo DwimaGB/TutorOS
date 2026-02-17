@@ -2,70 +2,34 @@ import type { Request, Response } from "express"
 import User from "../models/user.model.js"
 import { generateToken } from "../utils/generateToken.js"
 
-export const registerUser = async (req: Request, res: Response) => {
-  try {
-    const { name, email, password } = req.body
+export const register = async (req: Request, res: Response) => {
+  const { name, email, password, role } = req.body
 
-    const existingUser = await User.findOne({ email })
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" })
-    }
+  const userExists = await User.findOne({ email })
+  if (userExists)
+    return res.status(400).json({ message: "User already exists" })
 
-    const user = await User.create({
-      name,
-      email,
-      password,
-    })
-
-    const token = generateToken(user._id.toString())
-
-    res.status(201).json({
-      success: true,
-      token,
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    })
-  } catch (error) {
-    res.status(500).json({ message: "Registration failed" })
-  }
-}
-
-export const loginUser = async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body
-
-    const user = await User.findOne({ email }).select("+password")
-
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Invalid credentials" })
-    }
-
-    const token = generateToken(user._id.toString())
-
-    res.json({
-      success: true,
-      token,
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    })
-  } catch (error) {
-    res.status(500).json({ message: "Login failed" })
-  }
-}
-
-export const getMe = async (req: any, res: Response) => {
-  const user = await User.findById(req.user.id)
+  const user = await User.create({ name, email, password, role })
 
   res.json({
-    success: true,
-    data: user,
+    token: generateToken(user._id.toString()),
+    user,
+  })
+}
+
+export const login = async (req: Request, res: Response) => {
+  const { email, password } = req.body
+
+  const user = await User.findOne({ email })
+  if (!user)
+    return res.status(400).json({ message: "Invalid credentials" })
+
+  const isMatch = await user.comparePassword(password)
+  if (!isMatch)
+    return res.status(400).json({ message: "Invalid credentials" })
+
+  res.json({
+    token: generateToken(user._id.toString()),
+    user,
   })
 }

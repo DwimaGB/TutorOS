@@ -1,79 +1,60 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { api } from "@/lib/api"
 import { useRouter } from "next/navigation"
 
 export default function RegisterPage() {
   const router = useRouter()
 
-  useEffect(() => {
-  const token = localStorage.getItem("token")
-  if (token) router.push("/dashboard")
-}, [])
-
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
+    role: "student",
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    })
-  }
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
       const res = await api.post("/auth/register", form)
 
-      router.push("/login")
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Registration failed")
+      localStorage.setItem("token", res.data.token)
+
+      router.push("/dashboard")
+    } catch (err) {
+      console.error(err)
+      alert("Register failed")
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-4 p-6 border rounded w-96"
+    <form onSubmit={handleSubmit}>
+      <input
+        placeholder="Name"
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
+      />
+
+      <input
+        placeholder="Email"
+        onChange={(e) => setForm({ ...form, email: e.target.value })}
+      />
+
+      <input
+        type="password"
+        placeholder="Password"
+        onChange={(e) => setForm({ ...form, password: e.target.value })}
+      />
+
+      <select
+        onChange={(e) => setForm({ ...form, role: e.target.value })}
       >
-        <h2 className="text-xl font-bold">Register</h2>
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+      </select>
 
-        <input
-          name="name"
-          placeholder="Name"
-          value={form.name}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-
-        <input
-          name="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          className="border p-2 w-full"
-        />
-
-        <button className="bg-black text-white p-2 w-full">
-          Register
-        </button>
-      </form>
-    </div>
+      <button type="submit">Register</button>
+    </form>
   )
 }

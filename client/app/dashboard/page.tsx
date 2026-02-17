@@ -14,21 +14,5 @@ export default function Dashboard() {
     }
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    router.push("/login")
-  }
-
-  return (
-    <div className="p-6">
-      <h1>Dashboard</h1>
-
-      <button
-        onClick={handleLogout}
-        className="bg-red-500 text-white px-4 py-2 mt-4"
-      >
-        Logout
-      </button>
-    </div>
-  )
+  return <div>Dashboard</div>
 }

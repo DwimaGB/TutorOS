@@ -1,10 +1,10 @@
 import axios from "axios"
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-  withCredentials: true
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
 })
 
+// attach token automatically
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token")
 
