@@ -14,6 +14,9 @@ router.get("/", (req, res) => {
 
 router.post("/register", registerUser)
 router.post("/login", loginUser)
+router.post("/logout", (req, res) => {
+  res.json({ success: true, message: "Logged out" })
+})
 router.get("/me", protect, getMe)
 
 export default router
