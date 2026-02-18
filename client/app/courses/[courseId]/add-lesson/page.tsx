@@ -57,9 +57,11 @@ export default function AddLesson() {
       setVideoFile(null)
 
       setTimeout(() => router.push(`/courses/${courseId}`), 1200)
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      setError("Failed to upload lesson. Please try again.")
+      const message =
+        err?.response?.data?.message || "Upload failed. Please try again."
+      setError(message)
     } finally {
       setSubmitting(false)
     }
