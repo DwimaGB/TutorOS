@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import type { AxiosError } from "axios"
 import { api } from "@/lib/api"
+import Link from "next/link"
+import { BookOpen, Plus } from "lucide-react"
 
 interface Course {
   _id: string
@@ -30,11 +32,8 @@ export default function DashboardCoursesPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [loadingLessonsFor, setLoadingLessonsFor] = useState<string | null>(null)
-  const [creatingLessonFor, setCreatingLessonFor] = useState<string | null>(null)
-  const [lessonTitle, setLessonTitle] = useState("")
-  const [lessonVideoUrl, setLessonVideoUrl] = useState("")
   const [enrollMessage, setEnrollMessage] = useState<string | null>(null)
-  const [lessonMessage, setLessonMessage] = useState<string | null>(null)
+  const [enrollingFor, setEnrollingFor] = useState<string | null>(null)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -55,6 +54,11 @@ export default function DashboardCoursesPage() {
   }, [])
 
   const handleViewLessons = async (courseId: string) => {
+    if (selectedCourseId === courseId) {
+      setSelectedCourseId(null)
+      setLessons([])
+      return
+    }
     setSelectedCourseId(courseId)
     setLoadingLessonsFor(courseId)
     try {
@@ -62,6 +66,10 @@ export default function DashboardCoursesPage() {
       setLessons(res.data)
     } catch (err) {
       console.error(err)
+      const status = (err as AxiosError | undefined)?.response?.status
+      if (status === 403) {
+        setLessons([])
+      }
     } finally {
       setLoadingLessonsFor(null)
     }
@@ -70,39 +78,17 @@ export default function DashboardCoursesPage() {
   const handleEnroll = async (courseId: string) => {
     try {
       setEnrollMessage(null)
+      setEnrollingFor(courseId)
       await api.post(`/enrollment/${courseId}`)
-      setEnrollMessage("Enrolled successfully. Check your dashboard for My Courses.")
+      setEnrollMessage("Enrolled successfully! Check your dashboard for My Courses.")
     } catch (err: unknown) {
       const axiosErr = err as AxiosError<{ message?: string }> | undefined
       const message =
         axiosErr?.response?.data?.message ||
         "Could not enroll in this course. Please try again."
       setEnrollMessage(message)
-    }
-  }
-
-  const handleCreateLesson = async (courseId: string) => {
-    try {
-      setLessonMessage(null)
-      await api.post("/lessons", {
-        title: lessonTitle,
-        videoUrl: lessonVideoUrl,
-        course: courseId,
-      })
-      setLessonTitle("")
-      setLessonVideoUrl("")
-      setCreatingLessonFor(null)
-      // Refresh lessons list if we are viewing this course
-      if (selectedCourseId === courseId) {
-        await handleViewLessons(courseId)
-      }
-      setLessonMessage("Lesson created.")
-    } catch (err: unknown) {
-      const axiosErr = err as AxiosError<{ message?: string }> | undefined
-      const message =
-        axiosErr?.response?.data?.message ||
-        "Failed to create lesson. Make sure you are signed in as a teacher."
-      setLessonMessage(message)
+    } finally {
+      setEnrollingFor(null)
     }
   }
 
@@ -110,115 +96,95 @@ export default function DashboardCoursesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">All Courses</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">All Courses</h1>
+      </div>
 
       {enrollMessage && (
-        <p className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+        <p className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-400">
           {enrollMessage}
         </p>
       )}
 
-      {lessonMessage && (
-        <p className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-          {lessonMessage}
-        </p>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {courses.map((course) => (
-          <div
-            key={course._id}
-            className="rounded border bg-white p-4 shadow-sm space-y-3"
-          >
-            <div>
-              <h2 className="text-lg font-semibold">{course.title}</h2>
-              <p className="text-sm text-gray-700">{course.description}</p>
-              {typeof course.price === "number" && (
-                <p className="mt-1 text-sm text-gray-600">
-                  Price: ₹{course.price?.toFixed(2)}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleViewLessons(course._id)}
-                className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
-              >
-                {loadingLessonsFor === course._id
-                  ? "Loading lessons..."
-                  : "View Lessons"}
-              </button>
-
-              {!isAdmin && (
-                <button
-                  onClick={() => handleEnroll(course._id)}
-                  className="rounded bg-green-600 px-3 py-1 text-sm text-white"
-                >
-                  Enroll
-                </button>
-              )}
-
-              {isAdmin && (
-                <button
-                  onClick={() =>
-                    setCreatingLessonFor(
-                      creatingLessonFor === course._id ? null : course._id,
-                    )
-                  }
-                  className="rounded bg-gray-800 px-3 py-1 text-sm text-white"
-                >
-                  {creatingLessonFor === course._id
-                    ? "Cancel Lesson"
-                    : "Add Lesson"}
-                </button>
-              )}
-            </div>
-
-            {creatingLessonFor === course._id && (
-              <div className="mt-3 space-y-2 border-t pt-3">
-                <h3 className="font-medium text-sm">Create Lesson</h3>
-                <input
-                  className="w-full rounded border px-2 py-1 text-sm"
-                  placeholder="Lesson title"
-                  value={lessonTitle}
-                  onChange={(e) => setLessonTitle(e.target.value)}
-                />
-                <input
-                  className="w-full rounded border px-2 py-1 text-sm"
-                  placeholder="Video URL"
-                  value={lessonVideoUrl}
-                  onChange={(e) => setLessonVideoUrl(e.target.value)}
-                />
-                <button
-                  onClick={() => handleCreateLesson(course._id)}
-                  className="rounded bg-black px-3 py-1 text-sm text-white"
-                >
-                  Save Lesson
-                </button>
+      {courses.length === 0 ? (
+        <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
+          <BookOpen className="mx-auto mb-3 h-10 w-10 text-gray-600" />
+          <p className="text-gray-400">No courses available yet.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {courses.map((course) => (
+            <div
+              key={course._id}
+              className="rounded-xl border border-[#272D40] bg-[#181C27] p-5 space-y-4"
+            >
+              <div>
+                <h2 className="text-lg font-semibold text-white">{course.title}</h2>
+                <p className="mt-1 text-sm text-gray-400">{course.description}</p>
+                {typeof course.price === "number" && (
+                  <p className="mt-1 text-sm font-medium text-blue-400">
+                    ₹{course.price.toLocaleString()}
+                  </p>
+                )}
               </div>
-            )}
-          </div>
-        ))}
-      </div>
 
-      {selectedCourseId && lessons.length > 0 && (
-        <section className="mt-6">
-          <h2 className="text-xl font-semibold mb-3">Lessons</h2>
-          <ul className="space-y-2">
-            {lessons.map((lesson) => (
-              <li
-                key={lesson._id}
-                className="rounded border bg-white p-3 text-sm shadow-sm"
-              >
-                <p className="font-medium">{lesson.title}</p>
-                <p className="text-gray-700 break-all">{lesson.videoUrl}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleViewLessons(course._id)}
+                  className="rounded-lg bg-[#272D40] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#323948]"
+                >
+                  {loadingLessonsFor === course._id
+                    ? "Loading..."
+                    : selectedCourseId === course._id
+                      ? "Hide Lessons"
+                      : "View Lessons"}
+                </button>
+
+                {!isAdmin && (
+                  <button
+                    onClick={() => handleEnroll(course._id)}
+                    disabled={enrollingFor === course._id}
+                    className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60"
+                  >
+                    {enrollingFor === course._id ? "Enrolling..." : "Enroll"}
+                  </button>
+                )}
+
+                {isAdmin && (
+                  <Link href={`/courses/${course._id}/add-lesson`}>
+                    <button className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Lesson
+                    </button>
+                  </Link>
+                )}
+              </div>
+
+              {/* Lessons List */}
+              {selectedCourseId === course._id && lessons.length > 0 && (
+                <div className="space-y-2 border-t border-[#272D40] pt-4">
+                  <h3 className="text-sm font-medium text-gray-300">
+                    Lessons ({lessons.length})
+                  </h3>
+                  {lessons.map((lesson, index) => (
+                    <div
+                      key={lesson._id}
+                      className="flex items-center gap-3 rounded-lg bg-[#0F1117] p-3"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#272D40] text-xs font-semibold text-gray-400">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white">{lesson.title}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
 }
-
