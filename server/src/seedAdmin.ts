@@ -2,8 +2,10 @@ import mongoose from "mongoose"
 import dotenv from "dotenv"
 import User from "./models/user.model.js"
 
-import { setServers } from "node:dns/promises";
-setServers(["1.1.1.1", "8.8.8.8"]);
+if (process.env.NODE_ENV !== "production") {
+  const { setServers } = await import("node:dns/promises");
+  setServers(["1.1.1.1", "8.8.8.8"]); // Set DNS servers to Cloudflare to fix mongodb connection issue in local development
+}
 
 dotenv.config()
 
