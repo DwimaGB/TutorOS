@@ -23,5 +23,3 @@ Thumbs.db
 
 # VS Code
 .vscode/
-
-./server/seedAdmin.js
