@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useState, useEffect } from "react"
@@ -15,25 +14,24 @@ interface User {
 }
 
 export default function TeachHubLanding() {
-  const router = useRouter()
   const [year] = useState(() => new Date().getFullYear())
-  const [currentUser] = useState<User | null>(() => {
-    try {
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem("user") : null
-      return stored ? (JSON.parse(stored) as User) : null
-    } catch {
-      return null
-    }
-  })
+  const [user, setUser] = useState<User | null>(null)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem("token")
-
-    if (currentUser && token) {
-      router.push("/dashboard")
+    setHydrated(true)
+    try {
+      const stored = window.localStorage.getItem("user")
+      const token = window.localStorage.getItem("token")
+      if (stored && token) {
+        setUser(JSON.parse(stored) as User)
+      } else {
+        setUser(null)
+      }
+    } catch {
+      setUser(null)
     }
-  }, [router, currentUser])
+  }, [])
 
   return (
     <>
@@ -55,14 +53,26 @@ export default function TeachHubLanding() {
               </div>
 
               <div className="flex gap-3">
-                <Link href="/login">
-                  <Button className="border border-blue-600 bg-transparent text-white hover:bg-blue-600 hover:text-white">
-                    Login
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button className="bg-blue-600 text-white hover:bg-blue-700 hover:text-white">Get Started</Button>
-                </Link>
+                {hydrated && user ? (
+                  <Link href="/dashboard">
+                    <Button className="bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
+                      Dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/login">
+                      <Button className="border border-blue-600 bg-transparent text-white hover:bg-blue-600 hover:text-white">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link href="/register">
+                      <Button className="bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </header>
