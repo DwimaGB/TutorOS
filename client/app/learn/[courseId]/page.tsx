@@ -102,9 +102,9 @@ export default function LearnPage() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Video Area */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {current ? (
             <div>
               <div className="overflow-hidden rounded-xl border border-[#272D40] bg-black">
@@ -133,7 +133,7 @@ export default function LearnPage() {
         </div>
 
         {/* Lesson Sidebar */}
-        <aside className="w-80 shrink-0 overflow-y-auto border-l border-[#272D40] bg-[#181C27]">
+        <aside className="w-full shrink-0 overflow-y-auto border-t border-[#272D40] bg-[#181C27] lg:w-80 lg:border-t-0 lg:border-l">
           <div className="p-4">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
               Lessons ({lessons.length})
