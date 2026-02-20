@@ -25,4 +25,4 @@ Thumbs.db
 .vscode/
 
 # Admin seeding
-server/src/seedAdmin.ts
+server/src/seedAdmin.ts        

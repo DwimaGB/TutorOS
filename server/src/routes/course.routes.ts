@@ -1,10 +1,10 @@
 import express from "express"
 import {
-  createCourse,
-  getCourses,
-  getCourseById,
-  updateCourse,
-  deleteCourse,
+  createCourseHandler,
+  getCoursesHandler,
+  getCourseByIdHandler,
+  updateCourseHandler,
+  deleteCourseHandler,
 } from "../controllers/course.controller.js"
 import { uploadThumbnail } from "../middleware/upload.middleware.js"
 import { protect } from "../middleware/auth.middleware.js"
@@ -12,8 +12,8 @@ import { authorizeRoles } from "../middleware/role.middleware.js"
 
 const router = express.Router()
 
-router.get("/", getCourses)
-router.get("/:id", getCourseById)
+router.get("/", getCoursesHandler)
+router.get("/:id", getCourseByIdHandler)
 
 // Only admin (single teacher) can create courses
 router.post(
@@ -21,21 +21,22 @@ router.post(
   protect,
   authorizeRoles("admin"),
   uploadThumbnail.single("thumbnail"),
-  createCourse
+  createCourseHandler
 )
 
 router.put(
   "/:id",
   protect,
   authorizeRoles("admin"),
-  updateCourse
+  updateCourseHandler
 )
 
 router.delete(
   "/:id",
   protect,
   authorizeRoles("admin"),
-  deleteCourse
+  deleteCourseHandler
 )
 
 export default router
+
