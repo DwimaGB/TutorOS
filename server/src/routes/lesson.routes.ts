@@ -1,7 +1,7 @@
 import express from "express"
 import {
   createLessonHandler,
-  getLessonsHandler,
+  getLessonsBySectionHandler,
   updateLessonHandler,
   deleteLessonHandler,
 } from "../controllers/lesson.controller.js"
@@ -11,15 +11,12 @@ import { uploadVideo } from "../middleware/upload.middleware.js"
 
 const router = express.Router()
 
-// Only admin (single teacher) can create lessons
-// `upload.single('file')` handles the video upload and attaches `req.file`
 router.post("/", protect, authorizeRoles("admin"), uploadVideo.single("file"), createLessonHandler)
 
-router.get("/:courseId", protect, getLessonsHandler)
+router.get("/section/:sectionId", protect, getLessonsBySectionHandler)
 
 router.put("/:lessonId", protect, authorizeRoles("admin"), updateLessonHandler)
 
 router.delete("/:lessonId", protect, authorizeRoles("admin"), deleteLessonHandler)
 
 export default router
-

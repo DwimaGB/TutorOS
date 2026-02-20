@@ -7,7 +7,7 @@ import type { AxiosError } from "axios"
 import Link from "next/link"
 import { BookOpen, ArrowRight, Plus, Users, Layout, Video } from "lucide-react"
 
-interface Course {
+interface Batch {
   _id: string
   title: string
   description: string
@@ -15,7 +15,7 @@ interface Course {
 
 interface Enrollment {
   _id: string
-  course: Course
+  batch: Batch
 }
 
 interface User {
@@ -28,7 +28,7 @@ interface User {
 export default function Dashboard() {
   const router = useRouter()
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
-  const [courses, setCourses] = useState<Course[]>([])
+  const [batches, setBatches] = useState<Batch[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -51,11 +51,9 @@ export default function Dashboard() {
 
       try {
         if (user?.role === "admin") {
-          // Admin view: fetch all courses for management
-          const res = await api.get<Course[]>("/courses")
-          setCourses(res.data)
+          const res = await api.get<Batch[]>("/batches")
+          setBatches(res.data)
         } else {
-          // Student view: fetch enrollments
           const res = await api.get<Enrollment[]>("/enrollment/my")
           setEnrollments(res.data)
         }
@@ -76,8 +74,7 @@ export default function Dashboard() {
     }
   }, [user, router])
 
-  // Defensive: filter enrollments that have null courses
-  const validEnrollments = enrollments.filter((e) => e.course)
+  const validEnrollments = enrollments.filter((e) => e.batch)
 
   return (
     <div className="space-y-8">
@@ -88,27 +85,26 @@ export default function Dashboard() {
             <p className="mt-2 text-gray-400">
               Welcome back, <span className="font-semibold text-gray-300">{user.name}</span>{" "}
               <span className="rounded bg-blue-600/10 px-2 py-0.5 text-xs font-medium text-blue-400 uppercase tracking-wider">
-                {user.role}
+                {user.role === "admin" ? "teacher" : user.role}
               </span>
             </p>
           )}
         </div>
         {user?.role === "admin" && (
-          <Link href="/create-course">
+          <Link href="/create-batch">
             <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
               <Plus className="h-4 w-4" />
-              New Course
+              New Batch
             </button>
           </Link>
         )}
       </section>
 
       {user?.role === "admin" ? (
-        /* Admin View */
         <div className="space-y-8">
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              { label: "Total Courses", value: courses.length, icon: BookOpen, color: "text-blue-500" },
+              { label: "Total Batches", value: batches.length, icon: BookOpen, color: "text-blue-500" },
               { label: "Total Students", value: "--", icon: Users, color: "text-purple-500" },
               { label: "Active Lessons", value: "--", icon: Video, color: "text-green-500" },
             ].map((stat, i) => (
@@ -123,24 +119,24 @@ export default function Dashboard() {
           </div>
 
           <section>
-            <h2 className="mb-4 text-xl font-semibold text-white">Course Management</h2>
-            {courses.length === 0 ? (
+            <h2 className="mb-4 text-xl font-semibold text-white">Batch Management</h2>
+            {batches.length === 0 ? (
               <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
-                <p className="text-gray-400">No courses created yet.</p>
+                <p className="text-gray-400">No batches created yet.</p>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                {courses.map((course) => (
-                  <div key={course._id} className="group rounded-xl border border-[#272D40] bg-[#181C27] p-5 transition-all hover:border-blue-500/30">
-                    <h3 className="font-semibold text-white">{course.title}</h3>
-                    <p className="mt-2 text-sm text-gray-400 line-clamp-2">{course.description}</p>
+                {batches.map((batch) => (
+                  <div key={batch._id} className="group rounded-xl border border-[#272D40] bg-[#181C27] p-5 transition-all hover:border-blue-500/30">
+                    <h3 className="font-semibold text-white">{batch.title}</h3>
+                    <p className="mt-2 text-sm text-gray-400 line-clamp-2">{batch.description}</p>
                     <div className="mt-4 flex gap-2">
-                      <Link href={`/courses/${course._id}`} className="text-sm text-blue-500 hover:text-blue-400">
+                      <Link href={`/batches/${batch._id}`} className="text-sm text-blue-500 hover:text-blue-400">
                         View Details
                       </Link>
                       <span className="text-gray-600 text-sm">|</span>
-                      <Link href={`/courses/${course._id}/add-lesson`} className="text-sm text-gray-400 hover:text-white">
-                        Add Lesson
+                      <Link href={`/batches/${batch._id}/manage`} className="text-sm text-gray-400 hover:text-white">
+                        Manage Content
                       </Link>
                     </div>
                   </div>
@@ -150,16 +146,15 @@ export default function Dashboard() {
           </section>
         </div>
       ) : (
-        /* Student View */
         <section>
           <h2 className="mb-4 text-xl font-semibold text-white">My Learning</h2>
           {validEnrollments.length === 0 ? (
             <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
               <BookOpen className="mx-auto mb-3 h-10 w-10 text-gray-600" />
-              <p className="text-gray-400">You are not enrolled in any courses yet.</p>
-              <Link href="/courses">
+              <p className="text-gray-400">You are not enrolled in any batches yet.</p>
+              <Link href="/batches">
                 <button className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
-                  Browse Courses
+                  Browse Batches
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </Link>
@@ -167,13 +162,13 @@ export default function Dashboard() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {validEnrollments.map((enrollment) => (
-                <Link href={`/learn/${enrollment.course._id}`} key={enrollment._id}>
+                <Link href={`/learn/${enrollment.batch._id}`} key={enrollment._id}>
                   <div className="group rounded-xl border border-[#272D40] bg-[#181C27] p-5 transition-all hover:border-blue-500/30">
                     <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">
-                      {enrollment.course.title}
+                      {enrollment.batch.title}
                     </h3>
                     <p className="mt-2 text-sm text-gray-400 line-clamp-2">
-                      {enrollment.course.description}
+                      {enrollment.batch.description}
                     </p>
                     <span className="mt-3 inline-flex items-center gap-1 text-sm text-blue-500">
                       Continue Learning <ArrowRight className="h-3 w-3" />

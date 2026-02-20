@@ -46,7 +46,7 @@ export default function TeachHubLanding() {
               </div>
 
               <div className="hidden gap-6 text-sm text-gray-300 md:flex">
-                <a href="#courses" className="hover:text-white">Courses</a>
+                <a href="#batches" className="hover:text-white">Batches</a>
                 <a href="#features" className="hover:text-white">Features</a>
                 <a href="#pricing" className="hover:text-white">Pricing</a>
                 <a href="#faq" className="hover:text-white">FAQ</a>
@@ -89,13 +89,13 @@ export default function TeachHubLanding() {
             </motion.h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-400">
-              Interactive lessons, guided learning, and structured courses designed to help students understand concepts clearly and build confidence in their studies.
+              Interactive lessons, guided learning, and structured batches designed to help students understand concepts clearly and build confidence in their studies.
             </p>
 
             <div className="mt-8 flex justify-center gap-4">
-              <Link href="/courses">
+              <Link href="/dashboard">
                 <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                  Explore Courses
+                  Get Started
                 </Button>
               </Link>
               <Link href="/dashboard">
@@ -139,8 +139,8 @@ export default function TeachHubLanding() {
           </section>
 
           {/* Courses */}
-          <section id="courses" className="mx-auto max-w-6xl px-6 py-16">
-            <h2 className="text-center text-3xl font-semibold text-white">Popular Courses</h2>
+          <section id="batches" className="mx-auto max-w-6xl px-6 py-16">
+            <h2 className="text-center text-3xl font-semibold text-white">Your Batches</h2>
 
             <div className="mt-12 grid gap-6 md:grid-cols-3">
               {[1, 2, 3].map((course) => (

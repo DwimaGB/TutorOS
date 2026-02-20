@@ -1,50 +1,49 @@
 import mongoose from "mongoose"
 import Lesson from "../models/lesson.model.js"
-import Enrollment from "../models/enrollment.model.js"
-import Course from "../models/course.model.js"
+import Note from "../models/note.model.js"
+import Section from "../models/section.model.js"
 
 export async function createLesson(data: {
     title: string
     description: string
-    courseId: string
+    sectionId: string
     videoUrl: string
     publicId: string
+    order?: number
+    duration?: number
 }) {
-    const courseObjId = new mongoose.Types.ObjectId(data.courseId)
-    const course = await Course.findById(courseObjId)
-    if (!course) throw new Error("Course not found")
+    const sectionObjId = new mongoose.Types.ObjectId(data.sectionId)
+    const section = await Section.findById(sectionObjId)
+    if (!section) throw new Error("Section not found")
+
+    // Auto-assign order if not provided
+    let order = data.order
+    if (typeof order !== "number") {
+        const count = await Lesson.countDocuments({ section: sectionObjId })
+        order = count
+    }
 
     return await Lesson.create({
         title: data.title,
         description: data.description,
-        course: courseObjId,
+        section: sectionObjId,
         videoUrl: data.videoUrl,
         publicId: data.publicId,
+        order,
+        duration: data.duration || 0,
     })
 }
 
-export async function getLessons(courseId: string, userId: string, userRole: string) {
-    const courseObjId = new mongoose.Types.ObjectId(courseId)
-    const course = await Course.findById(courseObjId)
-    if (!course) throw new Error("Course not found")
-
-    if (userRole === "admin") {
-        return await Lesson.find({ course: courseObjId })
-    }
-
-    const enrollment = await Enrollment.findOne({
-        user: new mongoose.Types.ObjectId(userId),
-        course: courseObjId,
-    })
-
-    if (!enrollment) {
-        throw new Error("Access denied. Please enroll in this course.")
-    }
-
-    return await Lesson.find({ course: courseObjId })
+export async function getLessonsBySection(sectionId: string) {
+    return await Lesson.find({ section: sectionId }).sort({ order: 1 })
 }
 
-export async function updateLesson(lessonId: string, updates: { title?: string; description?: string }) {
+export async function updateLesson(lessonId: string, updates: {
+    title?: string
+    description?: string
+    order?: number
+    duration?: number
+}) {
     const lesson = await Lesson.findById(lessonId)
     if (!lesson) throw new Error("Lesson not found")
 
@@ -54,6 +53,12 @@ export async function updateLesson(lessonId: string, updates: { title?: string; 
     if (typeof updates.description === "string") {
         lesson.description = updates.description
     }
+    if (typeof updates.order === "number") {
+        lesson.order = updates.order
+    }
+    if (typeof updates.duration === "number") {
+        lesson.duration = updates.duration
+    }
 
     return await lesson.save()
 }
@@ -61,5 +66,9 @@ export async function updateLesson(lessonId: string, updates: { title?: string; 
 export async function deleteLesson(lessonId: string) {
     const deleted = await Lesson.findByIdAndDelete(lessonId)
     if (!deleted) throw new Error("Lesson not found")
+
+    // Cascade: delete notes attached to this lesson
+    await Note.deleteMany({ lesson: deleted._id })
+
     return deleted
 }

@@ -18,5 +18,15 @@ const videoStorage = new CloudinaryStorage({
   } as any,
 })
 
+const documentStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "teachhub/notes",
+    resource_type: "raw",
+  } as any,
+})
+
 export const uploadThumbnail = multer({ storage: imageStorage as any })
 export const uploadVideo = multer({ storage: videoStorage as any })
+export const uploadDocument = multer({ storage: documentStorage as any })
+

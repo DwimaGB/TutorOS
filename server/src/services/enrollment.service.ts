@@ -1,32 +1,32 @@
 import mongoose from "mongoose"
 import Enrollment from "../models/enrollment.model.js"
-import Course from "../models/course.model.js"
+import Batch from "../models/batch.model.js"
 
-export async function enrollStudent(courseIdStr: string, userIdStr: string, userRole: string) {
+export async function enrollStudent(batchIdStr: string, userIdStr: string, userRole: string) {
     if (userRole === "admin") {
-        throw new Error("Admins cannot enroll in courses")
+        throw new Error("Admins cannot enroll in batches")
     }
 
-    const courseId = new mongoose.Types.ObjectId(courseIdStr)
+    const batchId = new mongoose.Types.ObjectId(batchIdStr)
     const userId = new mongoose.Types.ObjectId(userIdStr)
 
-    const course = await Course.findById(courseId)
-    if (!course) {
-        throw new Error("Course not found")
+    const batch = await Batch.findById(batchId)
+    if (!batch) {
+        throw new Error("Batch not found")
     }
 
-    if (course.instructor?.toString() === userId.toString()) {
-        throw new Error("Instructors cannot enroll in their own courses")
+    if (batch.instructor?.toString() === userId.toString()) {
+        throw new Error("Instructors cannot enroll in their own batches")
     }
 
-    const existing = await Enrollment.findOne({ user: userId, course: courseId })
+    const existing = await Enrollment.findOne({ user: userId, batch: batchId })
     if (existing) {
-        throw new Error("You are already enrolled in this course")
+        throw new Error("Already enrolled in this batch")
     }
 
-    return await Enrollment.create({ user: userId, course: courseId })
+    return await Enrollment.create({ user: userId, batch: batchId })
 }
 
-export async function getMyCourses(userIdStr: string) {
-    return await Enrollment.find({ user: userIdStr }).populate("course")
+export async function getMyBatches(userIdStr: string) {
+    return await Enrollment.find({ user: userIdStr }).populate("batch")
 }

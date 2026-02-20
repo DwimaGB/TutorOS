@@ -1,10 +1,10 @@
 import type { Response } from "express"
-import { createLesson, getLessons, updateLesson, deleteLesson } from "../services/lesson.service.js"
+import { createLesson, getLessonsBySection, updateLesson, deleteLesson } from "../services/lesson.service.js"
 import type { AuthRequest } from "../middleware/auth.middleware.js"
 
 export const createLessonHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, courseId } = req.body
+    const { title, description, sectionId, order, duration } = req.body
     const file = (req as any).file
 
     if (!file) {
@@ -18,33 +18,38 @@ export const createLessonHandler = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Uploaded file missing URL or public id" })
     }
 
-    if (!courseId || typeof courseId !== "string") {
-      return res.status(400).json({ message: "Invalid course id" })
+    if (!sectionId || typeof sectionId !== "string") {
+      return res.status(400).json({ message: "Invalid section id" })
     }
 
-    const lesson = await createLesson({ title, description, courseId, videoUrl, publicId })
+    const lesson = await createLesson({
+      title,
+      description,
+      sectionId,
+      videoUrl,
+      publicId,
+      order: order ? Number(order) : 0,
+      duration: duration ? Number(duration) : 0,
+    })
+
     res.status(201).json(lesson)
   } catch (error: any) {
-    if (error.message === "Course not found") {
+    if (error.message === "Section not found") {
       return res.status(404).json({ message: error.message })
     }
     res.status(500).json({ message: "Server error" })
   }
 }
 
-export const getLessonsHandler = async (req: AuthRequest, res: Response) => {
+export const getLessonsBySectionHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { courseId } = req.params
-    if (typeof courseId !== "string") {
-      return res.status(400).json({ message: "Invalid course id" })
+    const { sectionId } = req.params
+    if (typeof sectionId !== "string") {
+      return res.status(400).json({ message: "Invalid section id" })
     }
-
-    const lessons = await getLessons(courseId, req.user._id.toString(), req.user.role)
+    const lessons = await getLessonsBySection(sectionId)
     res.json(lessons)
-  } catch (error: any) {
-    if (error.message === "Course not found") return res.status(404).json({ message: error.message })
-    if (error.message === "Access denied. Please enroll in this course.") return res.status(403).json({ message: error.message })
-
+  } catch (error) {
     res.status(500).json({ message: "Error fetching lessons" })
   }
 }
@@ -52,9 +57,9 @@ export const getLessonsHandler = async (req: AuthRequest, res: Response) => {
 export const updateLessonHandler = async (req: AuthRequest, res: Response) => {
   try {
     const { lessonId } = req.params
-    const { title, description } = req.body
+    const { title, description, order, duration } = req.body
 
-    const updated = await updateLesson(lessonId as string, { title, description })
+    const updated = await updateLesson(lessonId as string, { title, description, order, duration })
     res.json(updated)
   } catch (error: any) {
     if (error.message === "Lesson not found") return res.status(404).json({ message: error.message })

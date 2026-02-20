@@ -18,13 +18,19 @@ const lessonSchema = new mongoose.Schema(
       required: true,
     },
 
-    course: {
+    section: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
+      ref: "Section",
       required: true,
     },
+
+    order: { type: Number, default: 0 },
+
+    duration: { type: Number, default: 0 }, // duration in seconds
   },
   { timestamps: true }
 )
+
+lessonSchema.index({ section: 1, order: 1 })
 
 export default mongoose.model("Lesson", lessonSchema)
