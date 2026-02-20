@@ -147,7 +147,7 @@ export default function StudentsPage() {
                                                 <p className="text-sm text-gray-500">Not enrolled in any batches.</p>
                                             ) : (
                                                 <div className="space-y-2">
-                                                    {detail.enrollments.map((enrollment) => (
+                                                    {detail.enrollments.filter(e => e.batch).map((enrollment) => (
                                                         <div key={enrollment._id} className="flex items-center justify-between rounded-lg border border-[#272D40] bg-[#181C27] px-4 py-3">
                                                             <div className="flex items-center gap-3">
                                                                 <BookOpen className="h-4 w-4 text-blue-400" />

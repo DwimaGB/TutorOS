@@ -153,10 +153,22 @@ export default function BatchManagePage() {
         setError(null)
         setMessage(null)
         try {
+            // Extract video duration using built-in HTML5 browser capabilities
+            const videoDuration = await new Promise<number>((resolve) => {
+                const video = document.createElement("video")
+                video.preload = "metadata"
+                video.onloadedmetadata = () => {
+                    window.URL.revokeObjectURL(video.src)
+                    resolve(video.duration)
+                }
+                video.src = URL.createObjectURL(lessonVideo)
+            })
+
             const data = new FormData()
             data.append("title", lessonTitle)
             data.append("description", lessonDescription)
             data.append("sectionId", sectionId)
+            data.append("duration", Math.round(videoDuration).toString())
             data.append("file", lessonVideo)
 
             await api.post("/lessons", data)

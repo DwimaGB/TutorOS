@@ -175,8 +175,8 @@ export default function LearnPage() {
         {/* Video Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {current ? (
-            <div>
-              <div className="overflow-hidden rounded-xl border border-[#272D40] bg-black">
+            <div className="mx-auto max-w-4xl w-full">
+              <div className="overflow-hidden rounded-xl border border-[#272D40] bg-black shadow-lg">
                 <video
                   controls
                   key={current._id}
@@ -204,19 +204,37 @@ export default function LearnPage() {
                     {notes.map((note) => (
                       <button
                         key={note._id}
-                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/notes/${note._id}/download`, "_blank")}
-                        className="flex w-full items-center gap-3 rounded-lg border border-[#272D40] bg-[#181C27] p-3 transition-all hover:border-blue-500/30 text-left"
+                        onClick={() =>
+                          window.open(
+                            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/notes/${note._id}/download`,
+                            "_blank"
+                          )
+                        }
+                        className="
+                        group flex w-full items-center gap-3 rounded-lg 
+                        border border-[#272D40] bg-[#181C27] p-3 text-left
+                        hover:border-blue-500/40
+                        hover:bg-[#1E2332]
+                        hover:shadow-lg hover:shadow-blue-500/10
+                        "
                       >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10">
-                          <FileText className="h-4 w-4 text-blue-400" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 
+                  transition-colors duration-200 group-hover:bg-blue-600/20">
+                          <FileText className="h-4 w-4 text-blue-400 transition-colors group-hover:text-blue-300" />
                         </div>
+
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-white truncate">{note.title}</p>
+                          <p className="text-sm font-medium text-white truncate">
+                            {note.title}
+                          </p>
                           {note.description && (
-                            <p className="text-xs text-gray-500 truncate">{note.description}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {note.description}
+                            </p>
                           )}
                         </div>
-                        <Download className="h-4 w-4 shrink-0 text-gray-500" />
+
+                        <Download className="h-4 w-4 shrink-0 text-gray-500 transition-colors group-hover:text-blue-400" />
                       </button>
                     ))}
                   </div>
