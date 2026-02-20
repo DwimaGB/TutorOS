@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useState, useEffect } from "react"
@@ -14,28 +15,43 @@ interface User {
 }
 
 export default function TeachHubLanding() {
-  const [year] = useState(() => new Date().getFullYear())
-  const [user, setUser] = useState<User | null>(null)
-  const [hydrated, setHydrated] = useState(false)
+  const router = useRouter()
+  const [year, setYear] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setHydrated(true)
-    try {
-      const stored = window.localStorage.getItem("user")
-      const token = window.localStorage.getItem("token")
-      if (stored && token) {
-        setUser(JSON.parse(stored) as User)
-      } else {
-        setUser(null)
+    setYear(new Date().getFullYear())
+
+    // Check if user is logged in
+    const storedUser = localStorage.getItem("user")
+    const token = localStorage.getItem("token")
+
+    if (storedUser && token) {
+      try {
+        const user: User = JSON.parse(storedUser)
+
+        // Redirect based on role
+        if (user.role === "admin") {
+          router.push("/admin")
+        } else if (user.role === "student") {
+          router.push("/dashboard")
+        }
+      } catch (err) {
+        console.error("Error parsing user data:", err)
+        setIsLoading(false)
       }
-    } catch {
-      setUser(null)
+    } else {
+      setIsLoading(false)
     }
-  }, [])
+  }, [router])
 
   return (
     <>
-      {
+      {isLoading ? (
+        <div className="flex min-h-screen items-center justify-center bg-[#0F1117]">
+          <p className="text-white">Loading...</p>
+        </div>
+      ) : (
         <div className="min-h-screen bg-[#0F1117] text-white">
           {/* Navbar */}
           <header className="border-b border-[#272D40] bg-[#181C27]">
@@ -53,26 +69,14 @@ export default function TeachHubLanding() {
               </div>
 
               <div className="flex gap-3">
-                {hydrated && user ? (
-                  <Link href="/dashboard">
-                    <Button className="bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
-                      Dashboard
-                    </Button>
-                  </Link>
-                ) : (
-                  <>
-                    <Link href="/login">
-                      <Button className="border border-blue-600 bg-transparent text-white hover:bg-blue-600 hover:text-white">
-                        Login
-                      </Button>
-                    </Link>
-                    <Link href="/register">
-                      <Button className="bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </>
-                )}
+                <Link href="/login">
+                  <Button className="border border-blue-600 bg-transparent text-white hover:bg-blue-600 hover:text-white">
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button className="bg-blue-600 text-white hover:bg-blue-700 hover:text-white">Get Started</Button>
+                </Link>
               </div>
             </div>
           </header>
@@ -191,7 +195,7 @@ export default function TeachHubLanding() {
                 <Card key={t} className="bg-[#181C27] border-[#272D40]">
                   <CardContent className="p-6">
                     <p className="text-gray-300">
-                      &quot;This platform made learning much easier and more interesting for me.&quot;
+                      "This platform made learning much easier and more interesting for me."
                     </p>
                     <p className="mt-4 font-semibold text-white">— Student</p>
                   </CardContent>
@@ -246,7 +250,7 @@ export default function TeachHubLanding() {
             © {year || new Date().getFullYear()} TeachHub. All rights reserved.
           </footer>
         </div>
-      }
+      )}
     </>
   )
 }

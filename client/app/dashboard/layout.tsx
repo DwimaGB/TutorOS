@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { LayoutDashboard, BookOpen, LogOut, PlusCircle, Settings, Menu, X } from "lucide-react"
+import { LayoutDashboard, BookOpen, LogOut, PlusCircle, Settings, Menu, X, Users, FileText } from "lucide-react"
 
 interface User {
   _id: string
@@ -48,13 +48,15 @@ export default function DashboardLayout({
 
   const studentNav = [
     { href: "/dashboard", label: "My Learning", icon: LayoutDashboard },
-    { href: "/courses", label: "Browse Courses", icon: BookOpen },
+    { href: "/batches", label: "Browse Batches", icon: BookOpen },
   ]
 
   const adminNav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/create-course", label: "Create Course", icon: PlusCircle },
-    { href: "/dashboard/courses", label: "Manage Content", icon: Settings },
+    { href: "/dashboard/students", label: "Students", icon: Users },
+    { href: "/dashboard/notes", label: "Notes & Materials", icon: FileText },
+    { href: "/create-batch", label: "Create Batch", icon: PlusCircle },
+    { href: "/dashboard/batches", label: "Manage Content", icon: Settings },
   ]
 
   const navItems = user?.role === "admin" ? adminNav : studentNav
@@ -98,11 +100,10 @@ export default function DashboardLayout({
                   onClick={() => setMobileNavOpen(false)}
                 >
                   <div
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-blue-600/10 text-blue-400"
-                        : "text-gray-400 hover:bg-[#272D40] hover:text-white"
-                    }`}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
+                      ? "bg-blue-600/10 text-blue-400"
+                      : "text-gray-400 hover:bg-[#272D40] hover:text-white"
+                      }`}
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
@@ -148,11 +149,10 @@ export default function DashboardLayout({
             return (
               <Link href={item.href} key={item.href}>
                 <div
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-blue-600/10 text-blue-400"
-                      : "text-gray-400 hover:bg-[#272D40] hover:text-white"
-                  }`}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
+                    ? "bg-blue-600/10 text-blue-400"
+                    : "text-gray-400 hover:bg-[#272D40] hover:text-white"
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
