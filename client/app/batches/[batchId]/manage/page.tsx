@@ -6,7 +6,8 @@ import { api } from "@/lib/api"
 import Link from "next/link"
 import {
     ArrowLeft, Plus, Trash2, Edit3, Save, X, Upload, Loader2,
-    ChevronDown, ChevronUp, FileText, Download,
+    ChevronDown, ChevronUp, FileText, Download, Radio, Video as VideoIcon,
+    Calendar, ExternalLink, Clock,
 } from "lucide-react"
 import type { AxiosError } from "axios"
 
@@ -17,6 +18,11 @@ interface Lesson {
     videoUrl: string
     order: number
     duration: number
+    isLiveEnabled: boolean
+    livePlatform?: "zoom" | "youtube" | "other"
+    liveJoinUrl?: string
+    liveStartAt?: string
+    liveStatus?: "scheduled" | "live" | "ended"
 }
 
 interface Note {
@@ -57,6 +63,17 @@ export default function BatchManagePage() {
     const [lessonDescription, setLessonDescription] = useState("")
     const [lessonVideo, setLessonVideo] = useState<File | null>(null)
     const [uploadingLesson, setUploadingLesson] = useState(false)
+
+    // Live lesson mode
+    const [isLiveMode, setIsLiveMode] = useState(false)
+    const [livePlatform, setLivePlatform] = useState<"zoom" | "youtube" | "other">("zoom")
+    const [liveJoinUrl, setLiveJoinUrl] = useState("")
+    const [liveStartAt, setLiveStartAt] = useState("")
+
+    // Upload recording to existing live lesson
+    const [uploadRecordingForLesson, setUploadRecordingForLesson] = useState<string | null>(null)
+    const [recordingFile, setRecordingFile] = useState<File | null>(null)
+    const [uploadingRecording, setUploadingRecording] = useState(false)
 
     // Notes
     const [selectedLessonForNotes, setSelectedLessonForNotes] = useState<string | null>(null)
@@ -99,6 +116,17 @@ export default function BatchManagePage() {
             else next.add(id)
             return next
         })
+    }
+
+    const resetLessonForm = () => {
+        setAddLessonToSection(null)
+        setLessonTitle("")
+        setLessonDescription("")
+        setLessonVideo(null)
+        setIsLiveMode(false)
+        setLivePlatform("zoom")
+        setLiveJoinUrl("")
+        setLiveStartAt("")
     }
 
     // ─── Section CRUD ───
@@ -148,38 +176,61 @@ export default function BatchManagePage() {
 
     // ─── Lesson CRUD ───
     const handleUploadLesson = async (sectionId: string) => {
-        if (!lessonTitle.trim() || !lessonVideo) return
+        if (!lessonTitle.trim()) return
         setUploadingLesson(true)
         setError(null)
         setMessage(null)
+
         try {
-            // Extract video duration using built-in HTML5 browser capabilities
-            const videoDuration = await new Promise<number>((resolve) => {
-                const video = document.createElement("video")
-                video.preload = "metadata"
-                video.onloadedmetadata = () => {
-                    window.URL.revokeObjectURL(video.src)
-                    resolve(video.duration)
+            if (isLiveMode) {
+                // Create live lesson (no file upload)
+                if (!liveJoinUrl.trim() || !liveStartAt) {
+                    setError("Please fill in the join URL and start time for the live class.")
+                    setUploadingLesson(false)
+                    return
                 }
-                video.src = URL.createObjectURL(lessonVideo)
-            })
 
-            const data = new FormData()
-            data.append("title", lessonTitle)
-            data.append("description", lessonDescription)
-            data.append("sectionId", sectionId)
-            data.append("duration", Math.round(videoDuration).toString())
-            data.append("file", lessonVideo)
+                await api.post("/lessons/live", {
+                    title: lessonTitle,
+                    description: lessonDescription,
+                    sectionId,
+                    livePlatform,
+                    liveJoinUrl,
+                    liveStartAt,
+                })
+            } else {
+                // Create recorded lesson (with video upload)
+                if (!lessonVideo) {
+                    setError("Please upload a video file.")
+                    setUploadingLesson(false)
+                    return
+                }
 
-            await api.post("/lessons", data)
-            setLessonTitle("")
-            setLessonDescription("")
-            setLessonVideo(null)
-            setAddLessonToSection(null)
-            setMessage("Lesson uploaded!")
+                const videoDuration = await new Promise<number>((resolve) => {
+                    const video = document.createElement("video")
+                    video.preload = "metadata"
+                    video.onloadedmetadata = () => {
+                        window.URL.revokeObjectURL(video.src)
+                        resolve(video.duration)
+                    }
+                    video.src = URL.createObjectURL(lessonVideo)
+                })
+
+                const data = new FormData()
+                data.append("title", lessonTitle)
+                data.append("description", lessonDescription)
+                data.append("sectionId", sectionId)
+                data.append("duration", Math.round(videoDuration).toString())
+                data.append("file", lessonVideo)
+
+                await api.post("/lessons", data)
+            }
+
+            resetLessonForm()
+            setMessage(isLiveMode ? "Live class scheduled!" : "Lesson uploaded!")
             await fetchSections()
         } catch (err: any) {
-            setError(err?.response?.data?.message || "Failed to upload lesson")
+            setError(err?.response?.data?.message || "Failed to add lesson")
         } finally {
             setUploadingLesson(false)
         }
@@ -195,6 +246,52 @@ export default function BatchManagePage() {
             await fetchSections()
         } catch (err: any) {
             setError(err?.response?.data?.message || "Failed to delete lesson")
+        }
+    }
+
+    // ─── Upload recording to an existing live lesson ───
+    const handleUploadRecording = async (lessonId: string) => {
+        if (!recordingFile) return
+        setUploadingRecording(true)
+        setError(null)
+        setMessage(null)
+        try {
+            const videoDuration = await new Promise<number>((resolve) => {
+                const video = document.createElement("video")
+                video.preload = "metadata"
+                video.onloadedmetadata = () => {
+                    window.URL.revokeObjectURL(video.src)
+                    resolve(video.duration)
+                }
+                video.src = URL.createObjectURL(recordingFile)
+            })
+
+            const data = new FormData()
+            data.append("file", recordingFile)
+            data.append("duration", Math.round(videoDuration).toString())
+
+            await api.post(`/lessons/${lessonId}/recording`, data)
+            setUploadRecordingForLesson(null)
+            setRecordingFile(null)
+            setMessage("Recording uploaded!")
+            await fetchSections()
+        } catch (err: any) {
+            setError(err?.response?.data?.message || "Failed to upload recording")
+        } finally {
+            setUploadingRecording(false)
+        }
+    }
+
+    // ─── Update live status ───
+    const handleUpdateLiveStatus = async (lessonId: string, newStatus: "scheduled" | "live" | "ended") => {
+        setError(null)
+        setMessage(null)
+        try {
+            await api.put(`/lessons/${lessonId}`, { liveStatus: newStatus })
+            setMessage(`Status updated to "${newStatus}"`)
+            await fetchSections()
+        } catch (err: any) {
+            setError(err?.response?.data?.message || "Failed to update status")
         }
     }
 
@@ -249,6 +346,46 @@ export default function BatchManagePage() {
         } catch (err: any) {
             setError(err?.response?.data?.message || "Failed to delete note")
         }
+    }
+
+    // ─── Helper: format live status label ───
+    function liveStatusBadge(lesson: Lesson) {
+        if (!lesson.isLiveEnabled) return null
+        const status = lesson.liveStatus || "scheduled"
+        const hasRecording = !!lesson.videoUrl
+
+        if (hasRecording) {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+                    <VideoIcon className="h-2.5 w-2.5" />
+                    Recorded
+                </span>
+            )
+        }
+
+        if (status === "live") {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-400 border border-red-500/20 uppercase tracking-wider animate-pulse">
+                    <Radio className="h-2.5 w-2.5" />
+                    Live Now
+                </span>
+            )
+        }
+
+        if (status === "ended") {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/10 px-2 py-0.5 text-[10px] font-semibold text-gray-400 border border-gray-500/20 uppercase tracking-wider">
+                    Ended
+                </span>
+            )
+        }
+
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold text-yellow-400 border border-yellow-500/20 uppercase tracking-wider">
+                <Calendar className="h-2.5 w-2.5" />
+                Scheduled
+            </span>
+        )
     }
 
     if (loading) {
@@ -385,11 +522,65 @@ export default function BatchManagePage() {
                                                                         {idx + 1}
                                                                     </span>
                                                                     <div className="min-w-0">
-                                                                        <p className="text-sm font-medium text-white truncate">{lesson.title}</p>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="text-sm font-medium text-white truncate">{lesson.title}</p>
+                                                                            {liveStatusBadge(lesson)}
+                                                                        </div>
                                                                         {lesson.description && <p className="text-xs text-gray-500 truncate">{lesson.description}</p>}
+                                                                        {/* Live info row */}
+                                                                        {lesson.isLiveEnabled && lesson.liveStartAt && (
+                                                                            <p className="mt-0.5 text-xs text-gray-500 flex items-center gap-1">
+                                                                                <Clock className="h-3 w-3" />
+                                                                                {new Date(lesson.liveStartAt).toLocaleString()}
+                                                                                {lesson.livePlatform && (
+                                                                                    <span className="ml-1 text-gray-600">• {lesson.livePlatform}</span>
+                                                                                )}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center gap-2 ml-4 shrink-0">
+                                                                <div className="flex items-center gap-2 ml-4 shrink-0 flex-wrap justify-end">
+                                                                    {/* Live status controls */}
+                                                                    {lesson.isLiveEnabled && !lesson.videoUrl && (
+                                                                        <div className="flex items-center gap-1">
+                                                                            {lesson.liveStatus === "scheduled" && (
+                                                                                <button
+                                                                                    onClick={() => handleUpdateLiveStatus(lesson._id, "live")}
+                                                                                    className="rounded-lg bg-red-600/10 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 hover:bg-red-600/20 uppercase tracking-wider"
+                                                                                >
+                                                                                    Go Live
+                                                                                </button>
+                                                                            )}
+                                                                            {lesson.liveStatus === "live" && (
+                                                                                <button
+                                                                                    onClick={() => handleUpdateLiveStatus(lesson._id, "ended")}
+                                                                                    className="rounded-lg bg-gray-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-gray-400 hover:bg-gray-500/20 uppercase tracking-wider"
+                                                                                >
+                                                                                    End
+                                                                                </button>
+                                                                            )}
+                                                                            {/* Upload recording button */}
+                                                                            <button
+                                                                                onClick={() => setUploadRecordingForLesson(
+                                                                                    uploadRecordingForLesson === lesson._id ? null : lesson._id
+                                                                                )}
+                                                                                className="rounded-lg bg-blue-600/10 px-2.5 py-1.5 text-[10px] font-semibold text-blue-400 hover:bg-blue-600/20 uppercase tracking-wider"
+                                                                            >
+                                                                                <Upload className="h-3 w-3 inline mr-0.5" />
+                                                                                Recording
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    {lesson.isLiveEnabled && lesson.liveJoinUrl && (
+                                                                        <a
+                                                                            href={lesson.liveJoinUrl}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="rounded-lg bg-[#272D40] p-2 text-gray-400 hover:text-white hover:bg-[#323948]"
+                                                                        >
+                                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                                        </a>
+                                                                    )}
                                                                     <button
                                                                         onClick={() => toggleNotesForLesson(lesson._id)}
                                                                         className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${selectedLessonForNotes === lesson._id ? "bg-blue-600 text-white" : "bg-[#272D40] text-gray-400 hover:text-white hover:bg-[#323948]"}`}
@@ -404,6 +595,36 @@ export default function BatchManagePage() {
                                                                     </button>
                                                                 </div>
                                                             </div>
+
+                                                            {/* Upload recording panel */}
+                                                            {uploadRecordingForLesson === lesson._id && (
+                                                                <div className="bg-[#181C27] px-5 py-4 space-y-3 border-b border-[#272D40]">
+                                                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                                                        Upload Recording for &quot;{lesson.title}&quot;
+                                                                    </h4>
+                                                                    <div className="flex gap-2 items-center flex-wrap">
+                                                                        <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-[#272D40] bg-[#0F1117] px-4 py-3 text-xs text-gray-400 transition-colors hover:border-blue-500/50 flex-1 min-w-[200px]">
+                                                                            <Upload className="h-4 w-4" />
+                                                                            {recordingFile ? recordingFile.name : "Choose video file"}
+                                                                            <input type="file" accept="video/*" className="hidden" onChange={(e) => setRecordingFile(e.target.files?.[0] || null)} />
+                                                                        </label>
+                                                                        <button
+                                                                            onClick={() => handleUploadRecording(lesson._id)}
+                                                                            disabled={uploadingRecording || !recordingFile}
+                                                                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                                                        >
+                                                                            {uploadingRecording ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                                                            Upload
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => { setUploadRecordingForLesson(null); setRecordingFile(null) }}
+                                                                            className="rounded-lg bg-[#272D40] px-3 py-2.5 text-xs font-medium text-white hover:bg-[#323948]"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
 
                                                             {/* Notes panel for this lesson */}
                                                             {selectedLessonForNotes === lesson._id && (
@@ -472,8 +693,33 @@ export default function BatchManagePage() {
 
                                             {/* Add Lesson Form */}
                                             {addLessonToSection === section._id ? (
-                                                <div className="p-5 space-y-3">
+                                                <div className="p-5 space-y-4">
                                                     <h4 className="text-sm font-medium text-gray-300">Add Lesson</h4>
+
+                                                    {/* Toggle: Recorded vs Live */}
+                                                    <div className="flex items-center gap-3">
+                                                        <button
+                                                            onClick={() => setIsLiveMode(false)}
+                                                            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${!isLiveMode
+                                                                ? "bg-blue-600 text-white"
+                                                                : "bg-[#272D40] text-gray-400 hover:text-white"
+                                                                }`}
+                                                        >
+                                                            <VideoIcon className="h-4 w-4" />
+                                                            Recorded
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsLiveMode(true)}
+                                                            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${isLiveMode
+                                                                ? "bg-red-600 text-white"
+                                                                : "bg-[#272D40] text-gray-400 hover:text-white"
+                                                                }`}
+                                                        >
+                                                            <Radio className="h-4 w-4" />
+                                                            Live Class
+                                                        </button>
+                                                    </div>
+
                                                     <input
                                                         type="text"
                                                         required
@@ -489,21 +735,66 @@ export default function BatchManagePage() {
                                                         value={lessonDescription}
                                                         onChange={(e) => setLessonDescription(e.target.value)}
                                                     />
-                                                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#272D40] bg-[#0F1117] px-4 py-6 text-sm text-gray-400 transition-colors hover:border-blue-500/50">
-                                                        <Upload className="h-5 w-5" />
-                                                        {lessonVideo ? lessonVideo.name : "Click to upload video file"}
-                                                        <input type="file" accept="video/*" className="hidden" onChange={(e) => setLessonVideo(e.target.files?.[0] || null)} />
-                                                    </label>
+
+                                                    {isLiveMode ? (
+                                                        /* ─── Live class fields ─── */
+                                                        <div className="space-y-3 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                                                            <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
+                                                                Live Class Details
+                                                            </p>
+                                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                                <div>
+                                                                    <label className="text-xs text-gray-400 mb-1 block">Platform</label>
+                                                                    <select
+                                                                        value={livePlatform}
+                                                                        onChange={(e) => setLivePlatform(e.target.value as any)}
+                                                                        className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
+                                                                    >
+                                                                        <option value="zoom">Zoom</option>
+                                                                        <option value="youtube">YouTube Live</option>
+                                                                        <option value="other">Other</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-xs text-gray-400 mb-1 block">Start Date & Time</label>
+                                                                    <input
+                                                                        type="datetime-local"
+                                                                        value={liveStartAt}
+                                                                        onChange={(e) => setLiveStartAt(e.target.value)}
+                                                                        className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-xs text-gray-400 mb-1 block">Join URL</label>
+                                                                <input
+                                                                    type="url"
+                                                                    placeholder="https://zoom.us/j/123456789"
+                                                                    value={liveJoinUrl}
+                                                                    onChange={(e) => setLiveJoinUrl(e.target.value)}
+                                                                    className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        /* ─── Video upload ─── */
+                                                        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#272D40] bg-[#0F1117] px-4 py-6 text-sm text-gray-400 transition-colors hover:border-blue-500/50">
+                                                            <Upload className="h-5 w-5" />
+                                                            {lessonVideo ? lessonVideo.name : "Click to upload video file"}
+                                                            <input type="file" accept="video/*" className="hidden" onChange={(e) => setLessonVideo(e.target.files?.[0] || null)} />
+                                                        </label>
+                                                    )}
+
                                                     <div className="flex gap-2">
                                                         <button
                                                             onClick={() => handleUploadLesson(section._id)}
-                                                            disabled={uploadingLesson || !lessonTitle.trim() || !lessonVideo}
+                                                            disabled={uploadingLesson || !lessonTitle.trim() || (!isLiveMode && !lessonVideo) || (isLiveMode && (!liveJoinUrl.trim() || !liveStartAt))}
                                                             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
                                                         >
-                                                            {uploadingLesson ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading...</> : "Upload Lesson"}
+                                                            {uploadingLesson ? <><Loader2 className="h-4 w-4 animate-spin" />Processing...</> : isLiveMode ? "Schedule Live Class" : "Upload Lesson"}
                                                         </button>
                                                         <button
-                                                            onClick={() => { setAddLessonToSection(null); setLessonTitle(""); setLessonDescription(""); setLessonVideo(null) }}
+                                                            onClick={resetLessonForm}
                                                             className="rounded-lg bg-[#272D40] px-4 py-2 text-sm font-medium text-white hover:bg-[#323948]"
                                                         >
                                                             Cancel
