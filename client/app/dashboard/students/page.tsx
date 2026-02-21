@@ -22,6 +22,7 @@ interface Batch {
 interface Enrollment {
     _id: string
     batch: Batch
+    status: "pending" | "approved" | "rejected"
 }
 
 interface StudentDetail {
@@ -94,6 +95,19 @@ export default function StudentsPage() {
         }
     }
 
+    const statusBadge = (status: string) => {
+        switch (status) {
+            case "approved":
+                return <span className="rounded-full bg-green-500/10 border border-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">Approved</span>
+            case "pending":
+                return <span className="rounded-full bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 text-xs font-medium text-yellow-400">Pending</span>
+            case "rejected":
+                return <span className="rounded-full bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">Rejected</span>
+            default:
+                return null
+        }
+    }
+
     if (loading) {
         return <div className="flex items-center justify-center py-20"><p className="text-gray-400">Loading students...</p></div>
     }
@@ -142,7 +156,7 @@ export default function StudentsPage() {
                                         <p className="text-sm text-gray-400">Loading details...</p>
                                     ) : detail ? (
                                         <>
-                                            <h4 className="text-sm font-medium text-gray-300">Enrolled Batches ({detail.enrollments.length})</h4>
+                                            <h4 className="text-sm font-medium text-gray-300">Enrollments ({detail.enrollments.length})</h4>
                                             {detail.enrollments.length === 0 ? (
                                                 <p className="text-sm text-gray-500">Not enrolled in any batches.</p>
                                             ) : (
@@ -152,7 +166,10 @@ export default function StudentsPage() {
                                                             <div className="flex items-center gap-3">
                                                                 <BookOpen className="h-4 w-4 text-blue-400" />
                                                                 <div>
-                                                                    <p className="text-sm font-medium text-white">{enrollment.batch.title}</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="text-sm font-medium text-white">{enrollment.batch.title}</p>
+                                                                        {statusBadge(enrollment.status)}
+                                                                    </div>
                                                                     <p className="text-xs text-gray-500 line-clamp-1">{enrollment.batch.description}</p>
                                                                 </div>
                                                             </div>

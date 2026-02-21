@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { api } from "@/lib/api"
 import Link from "next/link"
-import { ArrowLeft, PlayCircle, Lock, ChevronDown, ChevronUp, Clock } from "lucide-react"
+import { ArrowLeft, PlayCircle, Lock, ChevronDown, ChevronUp, Clock, Hourglass } from "lucide-react"
 import type { AxiosError } from "axios"
 
 interface Batch {
@@ -55,6 +55,7 @@ export default function BatchDetails() {
     const [sections, setSections] = useState<Section[]>([])
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [enrollmentStatus, setEnrollmentStatus] = useState<"none" | "pending" | "approved" | "rejected">("none")
     const [sectionsError, setSectionsError] = useState<string | null>(null)
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
     const [enrolling, setEnrolling] = useState(false)
@@ -80,7 +81,6 @@ export default function BatchDetails() {
             try {
                 const sectionsRes = await api.get<Section[]>(`/sections/batch/${batchId}`)
                 setSections(sectionsRes.data)
-                // Auto-expand first section
                 if (sectionsRes.data.length > 0) {
                     setExpandedSections(new Set([sectionsRes.data[0]._id]))
                 }
@@ -93,6 +93,21 @@ export default function BatchDetails() {
                 } else {
                     console.error(err)
                 }
+            }
+
+            try {
+                const token = localStorage.getItem("token")
+                if (token) {
+                    const enrollRes = await api.get<{ _id: string; batch: { _id: string }; status: string }[]>(`/enrollment/my`)
+                    const myEnrollment = enrollRes.data.find((e) => e.batch && e.batch._id === batchId)
+                    if (myEnrollment) {
+                        setEnrollmentStatus(myEnrollment.status as "pending" | "approved" | "rejected")
+                    } else {
+                        setEnrollmentStatus("none")
+                    }
+                }
+            } catch (err) {
+                console.error(err)
             } finally {
                 setLoading(false)
             }
@@ -118,8 +133,8 @@ export default function BatchDetails() {
         setEnrollMsg(null)
         try {
             await api.post(`/enrollment/${batchId}`)
-            setEnrollMsg("Enrolled successfully!")
-            setTimeout(() => router.push("/dashboard"), 1200)
+            setEnrollMsg("Your enrollment request has been sent! The admin will review it shortly.")
+            setEnrollmentStatus("pending")
         } catch (err: any) {
             setEnrollMsg(err?.response?.data?.message || "Could not enroll. Please try again.")
         } finally {
@@ -158,13 +173,34 @@ export default function BatchDetails() {
                                     Manage Content
                                 </button>
                             </Link>
+                        ) : enrollmentStatus === "approved" ? (
+                            <Link href={`/learn/${batchId}`}>
+                                <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+                                    Go to Content
+                                </button>
+                            </Link>
+                        ) : enrollmentStatus === "pending" ? (
+                            <button
+                                disabled
+                                className="flex items-center gap-2 rounded-lg bg-yellow-600/20 border border-yellow-500/30 px-4 py-2 text-sm font-medium text-yellow-400 cursor-not-allowed"
+                            >
+                                <Hourglass className="h-4 w-4 animate-pulse" />
+                                Pending Approval
+                            </button>
+                        ) : enrollmentStatus === "rejected" ? (
+                            <button
+                                disabled
+                                className="rounded-lg bg-red-600/20 border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 cursor-not-allowed"
+                            >
+                                Enrollment Rejected
+                            </button>
                         ) : (
                             <button
                                 onClick={handleEnroll}
                                 disabled={enrolling}
                                 className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60"
                             >
-                                {enrolling ? "Enrolling..." : "Enroll in Batch"}
+                                {enrolling ? "Requesting..." : "Request Enrollment"}
                             </button>
                         )}
                     </div>
@@ -195,6 +231,27 @@ export default function BatchDetails() {
                                     </span>
                                 </>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Enrollment status banner for students */}
+                {!isAdmin && enrollmentStatus === "pending" && (
+                    <div className="mb-6 flex items-center gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-5 py-4">
+                        <Hourglass className="h-5 w-5 text-yellow-400 animate-pulse shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-yellow-300">Enrollment Pending</p>
+                            <p className="text-xs text-yellow-400/70 mt-0.5">Your request is awaiting admin approval. You&apos;ll get access once approved.</p>
+                        </div>
+                    </div>
+                )}
+
+                {!isAdmin && enrollmentStatus === "rejected" && (
+                    <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4">
+                        <Lock className="h-5 w-5 text-red-400 shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-red-300">Enrollment Rejected</p>
+                            <p className="text-xs text-red-400/70 mt-0.5">Your enrollment request was rejected. Please contact the admin for more information.</p>
                         </div>
                     </div>
                 )}

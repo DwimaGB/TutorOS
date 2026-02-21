@@ -2,6 +2,9 @@ import type { Response } from "express"
 import type { AuthRequest } from "../middleware/auth.middleware.js"
 import { createNote, getNotesByLesson, deleteNote, getNoteById } from "../services/note.service.js"
 import { supabase } from "../config/supabase.js"
+import Lesson from "../models/lesson.model.js"
+import Section from "../models/section.model.js"
+import { isEnrolledInBatch } from "../services/enrollment.service.js"
 
 export const createNoteHandler = async (req: AuthRequest, res: Response) => {
     try {
@@ -45,6 +48,7 @@ export const createNoteHandler = async (req: AuthRequest, res: Response) => {
         const note = await createNote({ title, description, lessonId, fileUrl, publicId })
         res.status(201).json(note)
     } catch (error: any) {
+        console.error("Error uploading note", error)
         if (error.message === "Lesson not found") {
             return res.status(404).json({ message: error.message })
         }
@@ -58,9 +62,28 @@ export const getNotesByLessonHandler = async (req: AuthRequest, res: Response) =
         if (typeof lessonId !== "string") {
             return res.status(400).json({ message: "Invalid lesson id" })
         }
+
+        const lesson = await Lesson.findById(lessonId)
+        if (!lesson) {
+            return res.status(404).json({ message: "Lesson not found" })
+        }
+
+        const section = await Section.findById(lesson.section)
+        if (!section) {
+            return res.status(404).json({ message: "Section not found" })
+        }
+
+        if (req.user && req.user.role !== "admin") {
+            const enrolled = await isEnrolledInBatch(req.user._id.toString(), section.batch.toString())
+            if (!enrolled) {
+                return res.status(403).json({ message: "Enroll in this batch to access notes." })
+            }
+        }
+
         const notes = await getNotesByLesson(lessonId)
         res.json(notes)
     } catch (error) {
+        console.error("Error fetching notes", error)
         res.status(500).json({ message: "Error fetching notes" })
     }
 }
@@ -75,6 +98,7 @@ export const deleteNoteHandler = async (req: AuthRequest, res: Response) => {
 
         res.json({ message: "Note deleted successfully" })
     } catch (error: any) {
+        console.error("Error deleting note", error)
         if (error.message === "Note not found") {
             return res.status(404).json({ message: error.message })
         }
@@ -93,6 +117,23 @@ export const downloadNoteHandler = async (req: AuthRequest, res: Response) => {
 
         if (!note.publicId) {
             return res.status(400).json({ message: "File not available" })
+        }
+
+        const lesson = await Lesson.findById(note.lesson)
+        if (!lesson) {
+            return res.status(404).json({ message: "Lesson not found" })
+        }
+
+        const section = await Section.findById(lesson.section)
+        if (!section) {
+            return res.status(404).json({ message: "Section not found" })
+        }
+
+        if (req.user && req.user.role !== "admin") {
+            const enrolled = await isEnrolledInBatch(req.user._id.toString(), section.batch.toString())
+            if (!enrolled) {
+                return res.status(403).json({ message: "Enroll in this batch to download notes." })
+            }
         }
 
         // Signed URL works for both public & private buckets

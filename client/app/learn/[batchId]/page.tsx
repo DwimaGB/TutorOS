@@ -243,7 +243,9 @@ export default function LearnPage() {
             </div>
           ) : (
             <div className="flex h-full items-center justify-center">
-              <p className="text-gray-500">No lessons available.</p>
+              <p className="text-gray-500">
+                Lessons are not available for this batch yet. Please check back later.
+              </p>
             </div>
           )}
         </div>
@@ -255,7 +257,11 @@ export default function LearnPage() {
               Content
             </h2>
 
-            {sections.map((section) => {
+            {sections.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                This batch does not have any sections or lessons yet.
+              </p>
+            ) : sections.map((section) => {
               const isExpanded = expandedSections.has(section._id)
               return (
                 <div key={section._id} className="mb-2">

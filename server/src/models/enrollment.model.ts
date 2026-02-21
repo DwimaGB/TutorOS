@@ -8,6 +8,11 @@ const enrollmentSchema = new mongoose.Schema(
       ref: "Batch",
       required: true,
     },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
     progress: { type: Number, default: 0 },
   },
   { timestamps: true }
