@@ -1,6 +1,6 @@
 import type { Response } from "express"
 import type { AuthRequest } from "../middleware/auth.middleware.js"
-import { getAllStudents, getStudentById, removeStudentFromBatch } from "../services/student.service.js"
+import { getAllStudents, getStudentById, removeStudentFromBatch, adminEnrollStudent, getStudentsByBatch } from "../services/student.service.js"
 
 export const getStudentsHandler = async (_req: AuthRequest, res: Response) => {
     try {
@@ -32,5 +32,31 @@ export const removeStudentFromBatchHandler = async (req: AuthRequest, res: Respo
             return res.status(404).json({ message: error.message })
         }
         res.status(500).json({ message: "Error removing student from batch" })
+    }
+}
+
+export const adminEnrollStudentHandler = async (req: AuthRequest, res: Response) => {
+    try {
+        const { studentId, batchId } = req.body
+        if (!studentId || !batchId) {
+            return res.status(400).json({ message: "studentId and batchId are required" })
+        }
+        const enrollment = await adminEnrollStudent(studentId, batchId)
+        res.status(201).json(enrollment)
+    } catch (error: any) {
+        if (error.message === "Student not found" || error.message === "Student already enrolled") {
+            return res.status(400).json({ message: error.message })
+        }
+        res.status(500).json({ message: "Error enrolling student" })
+    }
+}
+
+export const getStudentsByBatchHandler = async (req: AuthRequest, res: Response) => {
+    try {
+        const { batchId } = req.params
+        const students = await getStudentsByBatch(batchId as string)
+        res.json(students)
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching batch students" })
     }
 }

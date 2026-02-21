@@ -74,10 +74,8 @@ export default function DashboardLayout({
   const adminNav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-    { href: "/dashboard/enrollments", label: "Enrollment Requests", icon: Hourglass },
-    { href: "/dashboard/students", label: "Students", icon: Users },
-    { href: "/create-batch", label: "Create Batch", icon: PlusCircle },
-    { href: "/dashboard/batches", label: "Manage Content", icon: Settings },
+    { href: "/dashboard/students", label: "Manage Students", icon: Users },
+    { href: "/dashboard/batches", label: "Manage Batches", icon: Settings },
   ]
 
   const navItems = user?.role === "admin" ? adminNav : studentNav
