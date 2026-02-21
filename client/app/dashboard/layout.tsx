@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { LayoutDashboard, BookOpen, LogOut, PlusCircle, Settings, Menu, X, Users, FileText } from "lucide-react"
+import { LayoutDashboard, BookOpen, LogOut, PlusCircle, Settings, Menu, X, Users, FileText, Hourglass } from "lucide-react"
 
 interface User {
   _id: string
@@ -53,6 +53,7 @@ export default function DashboardLayout({
 
   const adminNav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/enrollments", label: "Enrollment Requests", icon: Hourglass },
     { href: "/dashboard/students", label: "Students", icon: Users },
     { href: "/dashboard/notes", label: "Notes & Materials", icon: FileText },
     { href: "/create-batch", label: "Create Batch", icon: PlusCircle },

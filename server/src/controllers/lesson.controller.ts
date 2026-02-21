@@ -1,6 +1,8 @@
 import type { Response } from "express"
 import { createLesson, getLessonsBySection, updateLesson, deleteLesson } from "../services/lesson.service.js"
 import type { AuthRequest } from "../middleware/auth.middleware.js"
+import Section from "../models/section.model.js"
+import { isEnrolledInBatch } from "../services/enrollment.service.js"
 
 export const createLessonHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -34,6 +36,7 @@ export const createLessonHandler = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json(lesson)
   } catch (error: any) {
+    console.error("Error creating lesson", error)
     if (error.message === "Section not found") {
       return res.status(404).json({ message: error.message })
     }
@@ -47,9 +50,23 @@ export const getLessonsBySectionHandler = async (req: AuthRequest, res: Response
     if (typeof sectionId !== "string") {
       return res.status(400).json({ message: "Invalid section id" })
     }
+
+    const section = await Section.findById(sectionId)
+    if (!section) {
+      return res.status(404).json({ message: "Section not found" })
+    }
+
+    if (req.user && req.user.role !== "admin") {
+      const enrolled = await isEnrolledInBatch(req.user._id.toString(), section.batch.toString())
+      if (!enrolled) {
+        return res.status(403).json({ message: "Enroll in this batch to access content." })
+      }
+    }
+
     const lessons = await getLessonsBySection(sectionId)
     res.json(lessons)
   } catch (error) {
+    console.error("Error fetching lessons", error)
     res.status(500).json({ message: "Error fetching lessons" })
   }
 }
@@ -62,6 +79,7 @@ export const updateLessonHandler = async (req: AuthRequest, res: Response) => {
     const updated = await updateLesson(lessonId as string, { title, description, order, duration })
     res.json(updated)
   } catch (error: any) {
+    console.error("Error updating lesson", error)
     if (error.message === "Lesson not found") return res.status(404).json({ message: error.message })
     res.status(500).json({ message: "Error updating lesson" })
   }
@@ -73,6 +91,7 @@ export const deleteLessonHandler = async (req: AuthRequest, res: Response) => {
     await deleteLesson(lessonId as string)
     res.json({ message: "Lesson deleted successfully" })
   } catch (error: any) {
+    console.error("Error deleting lesson", error)
     if (error.message === "Lesson not found") return res.status(404).json({ message: error.message })
     res.status(500).json({ message: "Error deleting lesson" })
   }

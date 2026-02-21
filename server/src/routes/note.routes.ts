@@ -13,7 +13,7 @@ const router = express.Router()
 
 router.post("/", protect, authorizeRoles("admin"), uploadDocument.single("file"), createNoteHandler)
 router.get("/lesson/:lessonId", protect, getNotesByLessonHandler)
-router.get("/:noteId/download", downloadNoteHandler)
+router.get("/:noteId/download", protect, downloadNoteHandler)
 router.delete("/:noteId", protect, authorizeRoles("admin"), deleteNoteHandler)
 
 export default router
