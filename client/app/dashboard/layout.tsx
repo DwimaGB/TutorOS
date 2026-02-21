@@ -3,7 +3,8 @@
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { LayoutDashboard, BookOpen, LogOut, PlusCircle, Settings, Menu, X, Users, FileText, Hourglass, BarChart3 } from "lucide-react"
+import { LayoutDashboard, BookOpen, LogOut, PlusCircle, Settings, Menu, X, Users, FileText, Hourglass, BarChart3, Bell } from "lucide-react"
+import { api } from "@/lib/api"
 
 interface User {
   _id: string
@@ -22,6 +23,7 @@ export default function DashboardLayout({
   const [hydrated, setHydrated] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
     setHydrated(true)
@@ -35,10 +37,27 @@ export default function DashboardLayout({
 
     if (stored) {
       try {
-        setUser(JSON.parse(stored) as User)
+        const parsed = JSON.parse(stored) as User
+        setUser(parsed)
       } catch { /* ignore */ }
     }
   }, [router])
+
+  // Poll unread count for students
+  useEffect(() => {
+    if (!user || user.role === "admin") return
+
+    const fetchCount = async () => {
+      try {
+        const res = await api.get<{ count: number }>("/notifications/unread-count")
+        setUnreadCount(res.data.count)
+      } catch { /* ignore */ }
+    }
+
+    fetchCount()
+    const interval = setInterval(fetchCount, 30000) // Poll every 30s
+    return () => clearInterval(interval)
+  }, [user])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -48,6 +67,7 @@ export default function DashboardLayout({
 
   const studentNav = [
     { href: "/dashboard", label: "My Learning", icon: LayoutDashboard },
+    { href: "/dashboard/notifications", label: "Notifications", icon: Bell, badge: unreadCount },
     { href: "/batches", label: "Browse Batches", icon: BookOpen },
   ]
 
@@ -56,7 +76,6 @@ export default function DashboardLayout({
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/dashboard/enrollments", label: "Enrollment Requests", icon: Hourglass },
     { href: "/dashboard/students", label: "Students", icon: Users },
-    { href: "/dashboard/notes", label: "Notes & Materials", icon: FileText },
     { href: "/create-batch", label: "Create Batch", icon: PlusCircle },
     { href: "/dashboard/batches", label: "Manage Content", icon: Settings },
   ]
@@ -70,12 +89,25 @@ export default function DashboardLayout({
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
           <span className="text-lg font-semibold text-white">TeachHub</span>
         </div>
-        <button
-          onClick={() => setMobileNavOpen((open) => !open)}
-          className="inline-flex items-center justify-center rounded-md border border-[#272D40] p-2 text-gray-300 hover:bg-[#272D40] hover:text-white"
-        >
-          {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Mobile notification bell for students */}
+          {user?.role !== "admin" && (
+            <Link href="/dashboard/notifications" className="relative p-2 text-gray-300 hover:text-white">
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
+          <button
+            onClick={() => setMobileNavOpen((open) => !open)}
+            className="inline-flex items-center justify-center rounded-md border border-[#272D40] p-2 text-gray-300 hover:bg-[#272D40] hover:text-white"
+          >
+            {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </header>
 
       {mobileNavOpen && (
@@ -95,6 +127,7 @@ export default function DashboardLayout({
             {navItems.map((item) => {
               const isActive = pathname === item.href
               const Icon = item.icon
+              const badge = (item as any).badge
               return (
                 <Link
                   href={item.href}
@@ -109,6 +142,11 @@ export default function DashboardLayout({
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
+                    {badge > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                        {badge > 99 ? "99+" : badge}
+                      </span>
+                    )}
                   </div>
                 </Link>
               )
@@ -148,6 +186,7 @@ export default function DashboardLayout({
           {navItems.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
+            const badge = (item as any).badge
             return (
               <Link href={item.href} key={item.href}>
                 <div
@@ -157,7 +196,12 @@ export default function DashboardLayout({
                     }`}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {badge > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white animate-pulse">
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
                 </div>
               </Link>
             )

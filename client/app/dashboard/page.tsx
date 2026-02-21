@@ -18,6 +18,7 @@ import {
   FileText,
   BarChart3,
   Layers,
+  Radio,
 } from "lucide-react"
 
 /* ─── Types ───────────────────────────────────────────────── */
@@ -110,6 +111,7 @@ export default function Dashboard() {
   const [overview, setOverview] = useState<OverviewStats | null>(null)
   const [batchAnalytics, setBatchAnalytics] = useState<BatchAnalytics[]>([])
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+  const [liveBatchIds, setLiveBatchIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const storedUser = window.localStorage.getItem("user")
@@ -130,18 +132,24 @@ export default function Dashboard() {
 
       try {
         if (user?.role === "admin") {
-          // Fetch all analytics data in parallel
-          const [overviewRes, batchesRes, activityRes] = await Promise.all([
+          // Fetch all analytics data + live batches in parallel
+          const [overviewRes, batchesRes, activityRes, liveRes] = await Promise.all([
             api.get<OverviewStats>("/analytics/overview"),
             api.get<BatchAnalytics[]>("/analytics/batches"),
             api.get<ActivityItem[]>("/analytics/activity"),
+            api.get<{ liveBatchIds: string[] }>("/notifications/live-batches"),
           ])
           setOverview(overviewRes.data)
           setBatchAnalytics(batchesRes.data)
           setRecentActivity(activityRes.data)
+          setLiveBatchIds(new Set(liveRes.data.liveBatchIds))
         } else {
-          const res = await api.get<Enrollment[]>("/enrollment/my")
-          setEnrollments(res.data)
+          const [enrollRes, liveRes] = await Promise.all([
+            api.get<Enrollment[]>("/enrollment/my"),
+            api.get<{ liveBatchIds: string[] }>("/notifications/live-batches"),
+          ])
+          setEnrollments(enrollRes.data)
+          setLiveBatchIds(new Set(liveRes.data.liveBatchIds))
         }
       } catch (err: unknown) {
         console.error(err)
@@ -333,9 +341,17 @@ export default function Dashboard() {
                             className="border-b border-[#272D40]/50 transition-colors hover:bg-[#1e2333]"
                           >
                             <td className="px-5 py-3">
-                              <p className="font-medium text-white truncate max-w-[200px]">
-                                {batch.title}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-white truncate max-w-[200px]">
+                                  {batch.title}
+                                </p>
+                                {liveBatchIds.has(batch._id) && (
+                                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400 border border-red-500/20 animate-pulse">
+                                    <Radio className="h-2.5 w-2.5" />
+                                    LIVE
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-3 text-center">
                               <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-400">
@@ -457,10 +473,21 @@ export default function Dashboard() {
                   {batchAnalytics.map((batch) => (
                     <div
                       key={batch._id}
-                      className="group rounded-xl border border-[#272D40] bg-[#181C27] p-5 transition-all hover:border-blue-500/30"
+                      className={`group rounded-xl border bg-[#181C27] p-5 transition-all hover:border-blue-500/30 ${liveBatchIds.has(batch._id)
+                          ? "border-red-500/30 shadow-lg shadow-red-500/5"
+                          : "border-[#272D40]"
+                        }`}
                     >
                       <div className="flex items-start justify-between">
-                        <h3 className="font-semibold text-white">{batch.title}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-white">{batch.title}</h3>
+                          {liveBatchIds.has(batch._id) && (
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400 border border-red-500/20 animate-pulse">
+                              <Radio className="h-2.5 w-2.5" />
+                              LIVE
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-gray-400">
                           <span className="flex items-center gap-1">
                             <Users className="h-3.5 w-3.5" />
@@ -597,16 +624,35 @@ export default function Dashboard() {
           <div className="grid gap-4 sm:grid-cols-2">
             {approvedEnrollments.map((enrollment) => (
               <Link href={`/learn/${enrollment.batch._id}`} key={enrollment._id}>
-                <div className="group rounded-xl border border-[#272D40] bg-[#181C27] p-5 transition-all hover:border-blue-500/30">
-                  <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">
-                    {enrollment.batch.title}
-                  </h3>
+                <div className={`group relative rounded-xl border bg-[#181C27] p-5 transition-all hover:border-blue-500/30 ${liveBatchIds.has(enrollment.batch._id)
+                  ? "border-red-500/30 shadow-lg shadow-red-500/5"
+                  : "border-[#272D40]"
+                  }`}>
+                  <div className="flex items-start justify-between">
+                    <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">
+                      {enrollment.batch.title}
+                    </h3>
+                    {liveBatchIds.has(enrollment.batch._id) && (
+                      <span className="shrink-0 ml-2 inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-bold text-red-400 border border-red-500/20 animate-pulse">
+                        <Radio className="h-3 w-3" />
+                        LIVE
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-2 text-sm text-gray-400 line-clamp-2">
                     {enrollment.batch.description}
                   </p>
-                  <span className="mt-3 inline-flex items-center gap-1 text-sm text-blue-500">
-                    Continue Learning <ArrowRight className="h-3 w-3" />
-                  </span>
+                  <div className="mt-3 flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1 text-sm text-blue-500">
+                      Continue Learning <ArrowRight className="h-3 w-3" />
+                    </span>
+                    {liveBatchIds.has(enrollment.batch._id) && (
+                      <span className="inline-flex items-center gap-1 text-sm text-red-400 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                        Join Live
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Link>
             ))}

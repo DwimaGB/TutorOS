@@ -10,6 +10,8 @@ import {
 import type { AuthRequest } from "../middleware/auth.middleware.js"
 import Section from "../models/section.model.js"
 import { isEnrolledInBatch } from "../services/enrollment.service.js"
+import { notifyBatchStudents } from "../services/notification.service.js"
+import Lesson from "../models/lesson.model.js"
 
 export const createLessonHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -39,6 +41,14 @@ export const createLessonHandler = async (req: AuthRequest, res: Response) => {
       publicId,
       order: order ? Number(order) : 0,
       duration: duration ? Number(duration) : 0,
+    })
+
+    // Fire-and-forget notification
+    notifyBatchStudents({
+      sectionId,
+      type: "lesson_uploaded",
+      message: `New lesson uploaded: "${title}"`,
+      lessonId: lesson._id.toString(),
     })
 
     res.status(201).json(lesson)
@@ -76,6 +86,14 @@ export const createLiveLessonHandler = async (req: AuthRequest, res: Response) =
       liveJoinUrl,
       liveStartAt,
       ...(order ? { order: Number(order) } : {}),
+    })
+
+    // Fire-and-forget notification
+    notifyBatchStudents({
+      sectionId,
+      type: "live_scheduled",
+      message: `Live class scheduled: "${title}"`,
+      lessonId: lesson._id.toString(),
     })
 
     res.status(201).json(lesson)
@@ -127,6 +145,20 @@ export const updateLessonHandler = async (req: AuthRequest, res: Response) => {
       title, description, order, duration,
       isLiveEnabled, livePlatform, liveJoinUrl, liveStartAt, liveStatus,
     })
+
+    // Notify students when a live class goes live
+    if (liveStatus === "live") {
+      const lessonDoc = await Lesson.findById(lessonId)
+      if (lessonDoc) {
+        notifyBatchStudents({
+          sectionId: lessonDoc.section.toString(),
+          type: "live_started",
+          message: `Live class started: "${updated.title}" — Join now!`,
+          lessonId: updated._id.toString(),
+        })
+      }
+    }
+
     res.json(updated)
   } catch (error: any) {
     console.error("Error updating lesson", error)
@@ -157,6 +189,15 @@ export const uploadRecordingHandler = async (req: AuthRequest, res: Response) =>
     }
 
     const updated = await uploadRecording(lessonId as string, videoUrl, publicId, duration)
+
+    // Notify students that a recording is now available
+    notifyBatchStudents({
+      sectionId: updated.section.toString(),
+      type: "recording_uploaded",
+      message: `Recording available: "${updated.title}"`,
+      lessonId: updated._id.toString(),
+    })
+
     res.json(updated)
   } catch (error: any) {
     console.error("Error uploading recording", error)

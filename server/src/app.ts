@@ -10,6 +10,7 @@ import enrollmentRoutes from "./routes/enrollment.routes.js"
 import studentRoutes from "./routes/student.routes.js"
 import noteRoutes from "./routes/note.routes.js"
 import analyticsRoutes from "./routes/analytics.routes.js"
+import notificationRoutes from "./routes/notification.routes.js"
 
 dotenv.config()
 
@@ -32,5 +33,6 @@ app.use("/api/enrollment", enrollmentRoutes)
 app.use("/api/students", studentRoutes)
 app.use("/api/notes", noteRoutes)
 app.use("/api/analytics", analyticsRoutes)
+app.use("/api/notifications", notificationRoutes)
 
 export default app
