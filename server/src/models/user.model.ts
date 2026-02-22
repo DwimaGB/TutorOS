@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string
   password: string
   role: "student" | "admin"
+  lastSeen?: Date
   comparePassword(password: string): Promise<boolean>
   createdAt: Date
   updatedAt: Date
@@ -30,6 +31,10 @@ const userSchema = new mongoose.Schema<IUser>(
       type: String,
       enum: ["student", "admin"],
       default: "student",
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
     },
   },
   { timestamps: true }

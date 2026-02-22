@@ -14,6 +14,9 @@ interface Student {
     name: string
     email: string
     createdAt: string
+    isOnline?: boolean
+    lastSeen?: string
+    approvedEnrollments: number
 }
 
 interface Batch {
@@ -58,6 +61,7 @@ export default function ManageStudentsPage() {
     const [enrolling, setEnrolling] = useState(false)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<"students" | "pending">("students")
+    const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline">("all")
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user")
@@ -67,6 +71,8 @@ export default function ManageStudentsPage() {
             const user = JSON.parse(storedUser)
             if (user.role !== "admin") { router.push("/dashboard"); return }
         } catch { router.push("/login"); return }
+
+        let intervalId: number | undefined
 
         const fetchAll = async () => {
             try {
@@ -84,13 +90,38 @@ export default function ManageStudentsPage() {
                 setLoading(false)
             }
         }
+
+        const fetchStudentsOnly = async () => {
+            try {
+                const studentsRes = await api.get<Student[]>("/students")
+                setStudents(studentsRes.data)
+            } catch (err) {
+                console.error(err)
+            }
+        }
+
         fetchAll()
+
+        intervalId = window.setInterval(fetchStudentsOnly, 30000)
+
+        return () => {
+            if (intervalId !== undefined) {
+                clearInterval(intervalId)
+            }
+        }
     }, [router])
 
-    const filteredStudents = students.filter((s) =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase())
-    )
+    const filteredStudents = students.filter((s) => {
+        const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
+            s.email.toLowerCase().includes(search.toLowerCase())
+        const matchesStatus = statusFilter === "all" ||
+            (statusFilter === "online" && s.isOnline) ||
+            (statusFilter === "offline" && !s.isOnline)
+        return matchesSearch && matchesStatus
+    })
+
+    const onlineCount = students.filter((s) => s.isOnline).length
+    const offlineCount = students.filter((s) => !s.isOnline).length
 
     const toggleStudent = async (studentId: string) => {
         if (expandedId === studentId) {
@@ -264,23 +295,49 @@ export default function ManageStudentsPage() {
             {/* ─── All Students Tab ─────────────────────────────── */}
             {activeTab === "students" && (
                 <>
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search by name or email..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full rounded-lg border border-[#272D40] bg-[#181C27] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50 transition-colors"
-                        />
+                    {/* Search + Filter Row */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder="Search by name or email..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full rounded-lg border border-[#272D40] bg-[#181C27] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50 transition-colors"
+                            />
+                        </div>
+
+                        {/* Status Filter Tabs */}
+                        <div className="flex rounded-lg border border-[#272D40] bg-[#0F1117] p-1 shrink-0">
+                            {([
+                                { key: "all" as const, label: "All Students", count: students.length },
+                                { key: "online" as const, label: "Online", count: onlineCount },
+                                { key: "offline" as const, label: "Offline", count: offlineCount },
+                            ]).map((tab) => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setStatusFilter(tab.key)}
+                                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${statusFilter === tab.key
+                                        ? "bg-[#1E2638] text-white shadow-sm"
+                                        : "text-gray-400 hover:text-gray-300"
+                                        }`}
+                                >
+                                    {tab.key === "online" && <span className="h-1.5 w-1.5 rounded-full bg-green-400" />}
+                                    {tab.key === "offline" && <span className="h-1.5 w-1.5 rounded-full bg-gray-500" />}
+                                    {tab.label}
+                                    <span className={`ml-0.5 text-[10px] ${statusFilter === tab.key ? "text-gray-300" : "text-gray-600"
+                                        }`}>({tab.count})</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {filteredStudents.length === 0 ? (
                         <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
                             <Users className="mx-auto mb-3 h-10 w-10 text-gray-600" />
                             <p className="text-gray-400">
-                                {search ? "No students match your search." : "No students have registered yet."}
+                                {search ? "No students match your search." : "No students is Online."}
                             </p>
                         </div>
                     ) : (
@@ -292,14 +349,33 @@ export default function ManageStudentsPage() {
                                         className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-[#1E2233]"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-bold text-white">
-                                                {student.name.charAt(0).toUpperCase()}
+                                            <div className="relative">
+                                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-bold text-white">
+                                                    {student.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#181C27] ${student.isOnline ? "bg-green-400" : "bg-gray-500"}`} />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-white text-sm">{student.name}</p>
-                                                <div className="flex items-center gap-3 mt-0.5">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium text-white text-sm">{student.name}</p>
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium border ${student.isOnline
+                                                        ? "bg-green-500/10 border-green-500/20 text-green-400"
+                                                        : "bg-gray-500/10 border-gray-500/20 text-gray-400"
+                                                        }`}>
+                                                        {student.isOnline ? "Online" : "Offline"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-3 mt-0.5">
                                                     <span className="flex items-center gap-1 text-xs text-gray-400"><Mail className="h-3 w-3" />{student.email}</span>
-                                                    <span className="flex items-center gap-1 text-xs text-gray-500"><Calendar className="h-3 w-3" />Joined {new Date(student.createdAt).toLocaleDateString()}</span>
+                                                    {!student.isOnline && student.lastSeen && (
+                                                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                                                            <Clock className="h-3 w-3" />
+                                                            Last seen {new Date(student.lastSeen).toLocaleDateString()} {new Date(student.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                        </span>
+                                                    )}
+                                                    {student.approvedEnrollments > 0 && (
+                                                        <span className="flex items-center gap-1 text-xs text-blue-400"><BookOpen className="h-3 w-3" />{student.approvedEnrollments} batch{student.approvedEnrollments !== 1 ? "es" : ""}</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

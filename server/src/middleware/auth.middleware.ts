@@ -17,7 +17,11 @@ export const protect = async (
 
   try {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET as string)
-    req.user = await User.findById(decoded.id).select("-password")
+    req.user = await User.findByIdAndUpdate(
+      decoded.id,
+      { lastSeen: new Date() },
+      { returnDocument: "after" }
+    ).select("-password")
     next()
   } catch {
     res.status(401).json({ message: "Token failed" })

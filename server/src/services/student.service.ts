@@ -3,7 +3,24 @@ import Enrollment from "../models/enrollment.model.js"
 import mongoose from "mongoose"
 
 export async function getAllStudents() {
-    return await User.find({ role: "student" }).select("-password").sort({ createdAt: -1 })
+    const students = await User.find({ role: "student" }).select("-password").sort({ createdAt: -1 }).lean()
+
+    // Get approved enrollment counts for all students in one query
+    const enrollmentCounts = await Enrollment.aggregate([
+        { $match: { status: "approved" } },
+        { $group: { _id: "$user", count: { $sum: 1 } } },
+    ])
+
+    const countMap = new Map(enrollmentCounts.map((e: { _id: mongoose.Types.ObjectId; count: number }) => [e._id.toString(), e.count]))
+
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+
+    return students.map((student) => ({
+        ...student,
+        approvedEnrollments: countMap.get(student._id.toString()) || 0,
+        isOnline: student.lastSeen ? new Date(student.lastSeen) > fiveMinutesAgo : false,
+        lastSeen: student.lastSeen,
+    }))
 }
 
 export async function getStudentById(studentId: string) {
