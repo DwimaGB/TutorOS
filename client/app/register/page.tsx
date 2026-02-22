@@ -50,13 +50,13 @@ export default function RegisterPage() {
         {/* Logo */}
         <Link href="/" className="mb-8 flex items-center justify-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-          <span className="text-xl font-semibold text-white">TeachHub</span>
+          <span className="text-xl font-semibold text-white">TeachOS</span>
         </Link>
 
         <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8">
           <h1 className="text-2xl font-semibold text-white">Create an account</h1>
           <p className="mt-1 text-sm text-gray-400">
-            Join TeachHub as a student. Courses are managed by the teacher.
+            Join TeachOS as a student. Courses are managed by the teacher.
           </p>
 
           {error && (

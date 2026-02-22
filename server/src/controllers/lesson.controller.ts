@@ -78,15 +78,20 @@ export const createLiveLessonHandler = async (req: AuthRequest, res: Response) =
       return res.status(400).json({ message: "Live start time is required" })
     }
 
-    const lesson = await createLiveLesson({
+    const lessonData: Parameters<typeof createLiveLesson>[0] = {
       title,
       description,
       sectionId,
       livePlatform: livePlatform || "zoom",
       liveJoinUrl,
       liveStartAt,
-      ...(order ? { order: Number(order) } : {}),
-    })
+    }
+
+    if (typeof order === "number") {
+      lessonData.order = order
+    }
+
+    const lesson = await createLiveLesson(lessonData)
 
     // Fire-and-forget notification
     notifyBatchStudents({

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "TeachHub",
+  title: "TeachOS",
   description: "Simple teaching platform demo",
 }
 
