@@ -10,12 +10,12 @@ const lessonSchema = new mongoose.Schema(
 
     videoUrl: {
       type: String,
-      required: true,
+      default: "",
     },
 
     publicId: {
       type: String,
-      required: true,
+      default: "",
     },
 
     section: {
@@ -27,6 +27,25 @@ const lessonSchema = new mongoose.Schema(
     order: { type: Number, default: 0 },
 
     duration: { type: Number, default: 0 }, // duration in seconds
+
+    // ─── Live class fields ───
+    isLiveEnabled: { type: Boolean, default: false },
+
+    livePlatform: {
+      type: String,
+      enum: ["zoom", "youtube", "other"],
+      default: "zoom",
+    },
+
+    liveJoinUrl: { type: String, default: "" },
+
+    liveStartAt: { type: Date, default: null },
+
+    liveStatus: {
+      type: String,
+      enum: ["scheduled", "live", "ended"],
+      default: "scheduled",
+    },
   },
   { timestamps: true }
 )

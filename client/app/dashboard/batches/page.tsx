@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react"
 import { api } from "@/lib/api"
 import Link from "next/link"
-import { BookOpen, Plus, Trash2, Edit3, Save, X } from "lucide-react"
+import { BookOpen, Plus, Trash2, Edit3, Save, X, Users, Video, FileText, Radio } from "lucide-react"
 import type { AxiosError } from "axios"
 
-interface Batch {
+interface BatchAnalytics {
     _id: string
     title: string
     description: string
+    approvedCount: number
+    pendingCount: number
+    totalSections: number
+    totalLessons: number
+    totalNotes: number
+    totalDuration: number
 }
 
 interface User {
@@ -20,7 +26,8 @@ interface User {
 
 export default function DashboardBatchesPage() {
     const [user, setUser] = useState<User | null>(null)
-    const [batches, setBatches] = useState<Batch[]>([])
+    const [batches, setBatches] = useState<BatchAnalytics[]>([])
+    const [liveBatchIds, setLiveBatchIds] = useState<Set<string>>(new Set())
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
@@ -36,8 +43,12 @@ export default function DashboardBatchesPage() {
 
         const fetchBatches = async () => {
             try {
-                const res = await api.get<Batch[]>("/batches")
-                setBatches(res.data)
+                const [analyticsRes, liveRes] = await Promise.all([
+                    api.get<BatchAnalytics[]>("/analytics/batches"),
+                    api.get<{ liveBatchIds: string[] }>("/notifications/live-batches"),
+                ])
+                setBatches(analyticsRes.data)
+                setLiveBatchIds(new Set(liveRes.data.liveBatchIds))
             } catch (err) {
                 console.error(err)
             }
@@ -51,11 +62,11 @@ export default function DashboardBatchesPage() {
         setError(null)
         setMessage(null)
         try {
-            const res = await api.put<Batch>(`/batches/${editingId}`, {
+            const res = await api.put<{ _id: string, title: string, description: string }>(`/batches/${editingId}`, {
                 title: editTitle,
                 description: editDescription,
             })
-            setBatches((prev) => prev.map((b) => (b._id === res.data._id ? res.data : b)))
+            setBatches((prev) => prev.map((b) => (b._id === res.data._id ? { ...b, title: res.data.title, description: res.data.description } : b)))
             setEditingId(null)
             setMessage("Batch updated!")
         } catch (err) {
@@ -85,7 +96,7 @@ export default function DashboardBatchesPage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-white">Manage Content</h1>
+                <h1 className="text-2xl font-bold text-white">Manage Batches</h1>
                 {isAdmin && (
                     <Link href="/create-batch">
                         <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
@@ -107,7 +118,7 @@ export default function DashboardBatchesPage() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                     {batches.map((batch) => (
-                        <div key={batch._id} className="rounded-xl border border-[#272D40] bg-[#181C27] p-5 space-y-4">
+                        <div key={batch._id} className={`group flex flex-col justify-between rounded-xl border bg-[#181C27] p-5 transition-all hover:border-blue-500/30 ${liveBatchIds.has(batch._id) ? "border-red-500/30 shadow-lg shadow-red-500/5" : "border-[#272D40]"}`}>
                             {editingId === batch._id ? (
                                 <div className="space-y-3">
                                     <input
@@ -135,31 +146,76 @@ export default function DashboardBatchesPage() {
                                 </div>
                             ) : (
                                 <>
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-white">{batch.title}</h2>
-                                        <p className="mt-1 text-sm text-gray-400">{batch.description}</p>
+                                    <div className="space-y-4">
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-semibold text-white">{batch.title}</h3>
+                                                {liveBatchIds.has(batch._id) && (
+                                                    <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400 border border-red-500/20 animate-pulse">
+                                                        <Radio className="h-2.5 w-2.5" />
+                                                        LIVE
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                <span className="flex items-center gap-1">
+                                                    <Users className="h-3.5 w-3.5" />
+                                                    {batch.approvedCount}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Video className="h-3.5 w-3.5" />
+                                                    {batch.totalLessons}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <FileText className="h-3.5 w-3.5" />
+                                                    {batch.totalNotes}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-400 line-clamp-2">{batch.description}</p>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Link href={`/batches/${batch._id}/manage`}>
-                                            <button className="rounded-lg bg-[#272D40] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#323948]">
-                                                Manage Sections
-                                            </button>
-                                        </Link>
+                                    <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
+                                        <div className="flex items-center gap-2">
+                                            <Link
+                                                href={`/batches/${batch._id}`}
+                                                className="text-sm text-blue-500 hover:text-blue-400 transition-colors"
+                                            >
+                                                View Details
+                                            </Link>
+                                            <span className="text-gray-600 text-sm">|</span>
+                                            <Link
+                                                href={`/batches/${batch._id}/manage`}
+                                                className="text-sm text-gray-400 hover:text-white transition-colors"
+                                            >
+                                                Manage Content
+                                            </Link>
+                                            <span className="text-gray-600 text-sm">|</span>
+                                            <Link
+                                                href={`/dashboard/analytics/${batch._id}`}
+                                                className="text-sm text-emerald-500 hover:text-emerald-400 transition-colors"
+                                            >
+                                                Analytics
+                                            </Link>
+                                        </div>
                                         {isAdmin && (
-                                            <>
+                                            <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => { setEditingId(batch._id); setEditTitle(batch.title); setEditDescription(batch.description) }}
-                                                    className="flex items-center gap-1 rounded-lg bg-[#272D40] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#323948]"
+                                                    className="rounded p-1 text-gray-400 hover:bg-[#272D40] hover:text-white transition-colors"
+                                                    title="Edit Batch Info"
                                                 >
-                                                    <Edit3 className="h-3.5 w-3.5" />Edit
+                                                    <Edit3 className="h-4 w-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(batch._id)}
-                                                    className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                                                    className="rounded p-1 text-red-500/70 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                                                    title="Delete Batch"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />Delete
+                                                    <Trash2 className="h-4 w-4" />
                                                 </button>
-                                            </>
+                                            </div>
                                         )}
                                     </div>
                                 </>

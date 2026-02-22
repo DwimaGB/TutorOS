@@ -5,6 +5,7 @@ import { supabase } from "../config/supabase.js"
 import Lesson from "../models/lesson.model.js"
 import Section from "../models/section.model.js"
 import { isEnrolledInBatch } from "../services/enrollment.service.js"
+import { notifyBatchStudents } from "../services/notification.service.js"
 
 export const createNoteHandler = async (req: AuthRequest, res: Response) => {
     try {
@@ -46,6 +47,18 @@ export const createNoteHandler = async (req: AuthRequest, res: Response) => {
         const fileUrl = publicUrlData.publicUrl
 
         const note = await createNote({ title, description, lessonId, fileUrl, publicId })
+
+        // Fire-and-forget notification
+        const lesson = await Lesson.findById(lessonId)
+        if (lesson) {
+            notifyBatchStudents({
+                sectionId: lesson.section.toString(),
+                type: "note_added",
+                message: `New material added: "${title}"`,
+                lessonId,
+            })
+        }
+
         res.status(201).json(note)
     } catch (error: any) {
         console.error("Error uploading note", error)

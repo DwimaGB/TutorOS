@@ -6,7 +6,8 @@ import { api } from "@/lib/api"
 import Link from "next/link"
 import {
     ArrowLeft, Plus, Trash2, Edit3, Save, X, Upload, Loader2,
-    ChevronDown, ChevronUp, FileText, Download,
+    ChevronDown, ChevronUp, FileText, Download, Radio, Video as VideoIcon,
+    Calendar, ExternalLink, Clock, Users, Search, Mail,
 } from "lucide-react"
 import type { AxiosError } from "axios"
 
@@ -17,6 +18,11 @@ interface Lesson {
     videoUrl: string
     order: number
     duration: number
+    isLiveEnabled: boolean
+    livePlatform?: "zoom" | "youtube" | "other"
+    liveJoinUrl?: string
+    liveStartAt?: string
+    liveStatus?: "scheduled" | "live" | "ended"
 }
 
 interface Note {
@@ -34,6 +40,13 @@ interface Section {
     lessons: Lesson[]
     lessonCount: number
     totalDuration: number
+}
+
+interface BatchStudent {
+    enrollmentId: string
+    student: { _id: string; name: string; email: string; createdAt: string }
+    status: "pending" | "approved" | "rejected"
+    enrolledAt: string
 }
 
 export default function BatchManagePage() {
@@ -58,6 +71,17 @@ export default function BatchManagePage() {
     const [lessonVideo, setLessonVideo] = useState<File | null>(null)
     const [uploadingLesson, setUploadingLesson] = useState(false)
 
+    // Live lesson mode
+    const [isLiveMode, setIsLiveMode] = useState(false)
+    const [livePlatform, setLivePlatform] = useState<"zoom" | "youtube" | "other">("zoom")
+    const [liveJoinUrl, setLiveJoinUrl] = useState("")
+    const [liveStartAt, setLiveStartAt] = useState("")
+
+    // Upload recording to existing live lesson
+    const [uploadRecordingForLesson, setUploadRecordingForLesson] = useState<string | null>(null)
+    const [recordingFile, setRecordingFile] = useState<File | null>(null)
+    const [uploadingRecording, setUploadingRecording] = useState(false)
+
     // Notes
     const [selectedLessonForNotes, setSelectedLessonForNotes] = useState<string | null>(null)
     const [notes, setNotes] = useState<Note[]>([])
@@ -68,6 +92,12 @@ export default function BatchManagePage() {
 
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+
+    // Tabs & Students
+    const [activeManageTab, setActiveManageTab] = useState<"content" | "students">("content")
+    const [batchStudents, setBatchStudents] = useState<BatchStudent[]>([])
+    const [loadingStudents, setLoadingStudents] = useState(false)
+    const [studentSearch, setStudentSearch] = useState("")
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user")
@@ -92,6 +122,18 @@ export default function BatchManagePage() {
         }
     }
 
+    const fetchBatchStudents = async () => {
+        setLoadingStudents(true)
+        try {
+            const res = await api.get<BatchStudent[]>(`/students/batch/${batchId}`)
+            setBatchStudents(res.data)
+        } catch (err) {
+            console.error(err)
+        } finally {
+            setLoadingStudents(false)
+        }
+    }
+
     const toggleSection = (id: string) => {
         setExpandedSections((prev) => {
             const next = new Set(prev)
@@ -99,6 +141,17 @@ export default function BatchManagePage() {
             else next.add(id)
             return next
         })
+    }
+
+    const resetLessonForm = () => {
+        setAddLessonToSection(null)
+        setLessonTitle("")
+        setLessonDescription("")
+        setLessonVideo(null)
+        setIsLiveMode(false)
+        setLivePlatform("zoom")
+        setLiveJoinUrl("")
+        setLiveStartAt("")
     }
 
     // ─── Section CRUD ───
@@ -148,38 +201,61 @@ export default function BatchManagePage() {
 
     // ─── Lesson CRUD ───
     const handleUploadLesson = async (sectionId: string) => {
-        if (!lessonTitle.trim() || !lessonVideo) return
+        if (!lessonTitle.trim()) return
         setUploadingLesson(true)
         setError(null)
         setMessage(null)
+
         try {
-            // Extract video duration using built-in HTML5 browser capabilities
-            const videoDuration = await new Promise<number>((resolve) => {
-                const video = document.createElement("video")
-                video.preload = "metadata"
-                video.onloadedmetadata = () => {
-                    window.URL.revokeObjectURL(video.src)
-                    resolve(video.duration)
+            if (isLiveMode) {
+                // Create live lesson (no file upload)
+                if (!liveJoinUrl.trim() || !liveStartAt) {
+                    setError("Please fill in the join URL and start time for the live class.")
+                    setUploadingLesson(false)
+                    return
                 }
-                video.src = URL.createObjectURL(lessonVideo)
-            })
 
-            const data = new FormData()
-            data.append("title", lessonTitle)
-            data.append("description", lessonDescription)
-            data.append("sectionId", sectionId)
-            data.append("duration", Math.round(videoDuration).toString())
-            data.append("file", lessonVideo)
+                await api.post("/lessons/live", {
+                    title: lessonTitle,
+                    description: lessonDescription,
+                    sectionId,
+                    livePlatform,
+                    liveJoinUrl,
+                    liveStartAt,
+                })
+            } else {
+                // Create recorded lesson (with video upload)
+                if (!lessonVideo) {
+                    setError("Please upload a video file.")
+                    setUploadingLesson(false)
+                    return
+                }
 
-            await api.post("/lessons", data)
-            setLessonTitle("")
-            setLessonDescription("")
-            setLessonVideo(null)
-            setAddLessonToSection(null)
-            setMessage("Lesson uploaded!")
+                const videoDuration = await new Promise<number>((resolve) => {
+                    const video = document.createElement("video")
+                    video.preload = "metadata"
+                    video.onloadedmetadata = () => {
+                        window.URL.revokeObjectURL(video.src)
+                        resolve(video.duration)
+                    }
+                    video.src = URL.createObjectURL(lessonVideo)
+                })
+
+                const data = new FormData()
+                data.append("title", lessonTitle)
+                data.append("description", lessonDescription)
+                data.append("sectionId", sectionId)
+                data.append("duration", Math.round(videoDuration).toString())
+                data.append("file", lessonVideo)
+
+                await api.post("/lessons", data)
+            }
+
+            resetLessonForm()
+            setMessage(isLiveMode ? "Live class scheduled!" : "Lesson uploaded!")
             await fetchSections()
         } catch (err: any) {
-            setError(err?.response?.data?.message || "Failed to upload lesson")
+            setError(err?.response?.data?.message || "Failed to add lesson")
         } finally {
             setUploadingLesson(false)
         }
@@ -195,6 +271,52 @@ export default function BatchManagePage() {
             await fetchSections()
         } catch (err: any) {
             setError(err?.response?.data?.message || "Failed to delete lesson")
+        }
+    }
+
+    // ─── Upload recording to an existing live lesson ───
+    const handleUploadRecording = async (lessonId: string) => {
+        if (!recordingFile) return
+        setUploadingRecording(true)
+        setError(null)
+        setMessage(null)
+        try {
+            const videoDuration = await new Promise<number>((resolve) => {
+                const video = document.createElement("video")
+                video.preload = "metadata"
+                video.onloadedmetadata = () => {
+                    window.URL.revokeObjectURL(video.src)
+                    resolve(video.duration)
+                }
+                video.src = URL.createObjectURL(recordingFile)
+            })
+
+            const data = new FormData()
+            data.append("file", recordingFile)
+            data.append("duration", Math.round(videoDuration).toString())
+
+            await api.post(`/lessons/${lessonId}/recording`, data)
+            setUploadRecordingForLesson(null)
+            setRecordingFile(null)
+            setMessage("Recording uploaded!")
+            await fetchSections()
+        } catch (err: any) {
+            setError(err?.response?.data?.message || "Failed to upload recording")
+        } finally {
+            setUploadingRecording(false)
+        }
+    }
+
+    // ─── Update live status ───
+    const handleUpdateLiveStatus = async (lessonId: string, newStatus: "scheduled" | "live" | "ended") => {
+        setError(null)
+        setMessage(null)
+        try {
+            await api.put(`/lessons/${lessonId}`, { liveStatus: newStatus })
+            setMessage(`Status updated to "${newStatus}"`)
+            await fetchSections()
+        } catch (err: any) {
+            setError(err?.response?.data?.message || "Failed to update status")
         }
     }
 
@@ -251,6 +373,46 @@ export default function BatchManagePage() {
         }
     }
 
+    // ─── Helper: format live status label ───
+    function liveStatusBadge(lesson: Lesson) {
+        if (!lesson.isLiveEnabled) return null
+        const status = lesson.liveStatus || "scheduled"
+        const hasRecording = !!lesson.videoUrl
+
+        if (hasRecording) {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+                    <VideoIcon className="h-2.5 w-2.5" />
+                    Recorded
+                </span>
+            )
+        }
+
+        if (status === "live") {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-400 border border-red-500/20 uppercase tracking-wider animate-pulse">
+                    <Radio className="h-2.5 w-2.5" />
+                    Live Now
+                </span>
+            )
+        }
+
+        if (status === "ended") {
+            return (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gray-500/10 px-2 py-0.5 text-[10px] font-semibold text-gray-400 border border-gray-500/20 uppercase tracking-wider">
+                    Ended
+                </span>
+            )
+        }
+
+        return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/10 px-2 py-0.5 text-[10px] font-semibold text-yellow-400 border border-yellow-500/20 uppercase tracking-wider">
+                <Calendar className="h-2.5 w-2.5" />
+                Scheduled
+            </span>
+        )
+    }
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#0F1117]">
@@ -270,9 +432,29 @@ export default function BatchManagePage() {
                         <ArrowLeft className="h-4 w-4" />
                         Dashboard
                     </Link>
-                    <h1 className="text-lg font-semibold text-white">Manage Batch Content</h1>
+                    <h1 className="text-lg font-semibold text-white">Manage Batch</h1>
                 </div>
             </header>
+
+            {/* Tab Navigation */}
+            <div className="border-b border-[#272D40] bg-[#181C27]">
+                <div className="mx-auto flex max-w-4xl gap-0 px-6">
+                    <button
+                        onClick={() => setActiveManageTab("content")}
+                        className={`relative px-4 py-3 text-sm font-medium transition-colors ${activeManageTab === "content" ? "text-blue-400" : "text-gray-400 hover:text-white"}`}
+                    >
+                        Content
+                        {activeManageTab === "content" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-t" />}
+                    </button>
+                    <button
+                        onClick={() => { setActiveManageTab("students"); fetchBatchStudents() }}
+                        className={`relative px-4 py-3 text-sm font-medium transition-colors ${activeManageTab === "students" ? "text-blue-400" : "text-gray-400 hover:text-white"}`}
+                    >
+                        Students
+                        {activeManageTab === "students" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-t" />}
+                    </button>
+                </div>
+            </div>
 
             <main className="mx-auto max-w-4xl px-6 py-10 space-y-8">
                 {error && (
@@ -282,250 +464,501 @@ export default function BatchManagePage() {
                     <p className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-400">{message}</p>
                 )}
 
-                {/* Add Section */}
-                <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-6">
-                    <h2 className="mb-4 text-lg font-semibold text-white">Add Section</h2>
-                    <div className="flex gap-3">
-                        <input
-                            type="text"
-                            className="flex-1 rounded-lg border border-[#272D40] bg-[#0F1117] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                            placeholder="e.g. Module 1 — Introduction"
-                            value={newSectionTitle}
-                            onChange={(e) => setNewSectionTitle(e.target.value)}
-                        />
-                        <button
-                            onClick={handleAddSection}
-                            disabled={addingSection || !newSectionTitle.trim()}
-                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-                        >
-                            {addingSection ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                            Add
-                        </button>
-                    </div>
-                </div>
+                {activeManageTab === "content" && (
+                    <>
+                        {/* Add Section */}
+                        <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-6">
+                            <h2 className="mb-4 text-lg font-semibold text-white">Add Section</h2>
+                            <div className="flex gap-3">
+                                <input
+                                    type="text"
+                                    className="flex-1 rounded-lg border border-[#272D40] bg-[#0F1117] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    placeholder="e.g. Module 1 — Introduction"
+                                    value={newSectionTitle}
+                                    onChange={(e) => setNewSectionTitle(e.target.value)}
+                                />
+                                <button
+                                    onClick={handleAddSection}
+                                    disabled={addingSection || !newSectionTitle.trim()}
+                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                >
+                                    {addingSection ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                    Add
+                                </button>
+                            </div>
+                        </div>
 
-                {/* Sections List */}
-                {sections.length === 0 ? (
-                    <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
-                        <p className="text-gray-400">No sections yet. Add one above to get started.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {sections.map((section) => {
-                            const isExpanded = expandedSections.has(section._id)
-                            const isEditing = editingSectionId === section._id
+                        {/* Sections List */}
+                        {sections.length === 0 ? (
+                            <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
+                                <p className="text-gray-400">No sections yet. Add one above to get started.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {sections.map((section) => {
+                                    const isExpanded = expandedSections.has(section._id)
+                                    const isEditing = editingSectionId === section._id
 
-                            return (
-                                <div key={section._id} className="rounded-xl border border-[#272D40] bg-[#181C27] overflow-hidden">
-                                    {/* Section Header */}
-                                    <div className="flex items-center justify-between px-5 py-4">
-                                        <button
-                                            onClick={() => toggleSection(section._id)}
-                                            className="flex items-center gap-3 text-left flex-1"
-                                        >
-                                            {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                                            {isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={editSectionTitle}
-                                                    onChange={(e) => setEditSectionTitle(e.target.value)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="flex-1 rounded border border-[#272D40] bg-[#0F1117] px-2 py-1 text-sm text-white outline-none focus:border-blue-500"
-                                                />
-                                            ) : (
-                                                <div>
-                                                    <h3 className="font-semibold text-white">{section.title}</h3>
-                                                    <p className="text-xs text-gray-500">
-                                                        {section.lessonCount} lesson{section.lessonCount !== 1 ? "s" : ""}
-                                                    </p>
+                                    return (
+                                        <div key={section._id} className="rounded-xl border border-[#272D40] bg-[#181C27] overflow-hidden">
+                                            {/* Section Header */}
+                                            <div className="flex items-center justify-between px-5 py-4">
+                                                <button
+                                                    onClick={() => toggleSection(section._id)}
+                                                    className="flex items-center gap-3 text-left flex-1"
+                                                >
+                                                    {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editSectionTitle}
+                                                            onChange={(e) => setEditSectionTitle(e.target.value)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="flex-1 rounded border border-[#272D40] bg-[#0F1117] px-2 py-1 text-sm text-white outline-none focus:border-blue-500"
+                                                        />
+                                                    ) : (
+                                                        <div>
+                                                            <h3 className="font-semibold text-white">{section.title}</h3>
+                                                            <p className="text-xs text-gray-500">
+                                                                {section.lessonCount} lesson{section.lessonCount !== 1 ? "s" : ""}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </button>
+
+                                                <div className="flex items-center gap-2 ml-4">
+                                                    {isEditing ? (
+                                                        <>
+                                                            <button onClick={() => handleUpdateSection(section._id)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+                                                                <Save className="h-3 w-3" />
+                                                            </button>
+                                                            <button onClick={() => setEditingSectionId(null)} className="rounded-lg bg-[#272D40] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#323948]">
+                                                                <X className="h-3 w-3" />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => { setEditingSectionId(section._id); setEditSectionTitle(section.title) }}
+                                                                className="rounded-lg bg-[#272D40] p-2 text-gray-400 hover:text-white hover:bg-[#323948]"
+                                                            >
+                                                                <Edit3 className="h-3.5 w-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteSection(section._id)}
+                                                                className="rounded-lg bg-red-600/10 p-2 text-red-400 hover:bg-red-600/20"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </button>
+                                            </div>
 
-                                        <div className="flex items-center gap-2 ml-4">
-                                            {isEditing ? (
-                                                <>
-                                                    <button onClick={() => handleUpdateSection(section._id)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
-                                                        <Save className="h-3 w-3" />
-                                                    </button>
-                                                    <button onClick={() => setEditingSectionId(null)} className="rounded-lg bg-[#272D40] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#323948]">
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <button
-                                                        onClick={() => { setEditingSectionId(section._id); setEditSectionTitle(section.title) }}
-                                                        className="rounded-lg bg-[#272D40] p-2 text-gray-400 hover:text-white hover:bg-[#323948]"
-                                                    >
-                                                        <Edit3 className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteSection(section._id)}
-                                                        className="rounded-lg bg-red-600/10 p-2 text-red-400 hover:bg-red-600/20"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Expanded Content */}
-                                    {isExpanded && (
-                                        <div className="border-t border-[#272D40] bg-[#0F1117]">
-                                            {/* Lessons */}
-                                            {section.lessons.length > 0 && (
-                                                <div>
-                                                    {section.lessons.map((lesson, idx) => (
-                                                        <div key={lesson._id}>
-                                                            <div className="flex items-center justify-between px-5 py-3 border-b border-[#272D40]">
-                                                                <div className="flex items-center gap-3 min-w-0">
-                                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#272D40] text-xs font-semibold text-gray-400">
-                                                                        {idx + 1}
-                                                                    </span>
-                                                                    <div className="min-w-0">
-                                                                        <p className="text-sm font-medium text-white truncate">{lesson.title}</p>
-                                                                        {lesson.description && <p className="text-xs text-gray-500 truncate">{lesson.description}</p>}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 ml-4 shrink-0">
-                                                                    <button
-                                                                        onClick={() => toggleNotesForLesson(lesson._id)}
-                                                                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${selectedLessonForNotes === lesson._id ? "bg-blue-600 text-white" : "bg-[#272D40] text-gray-400 hover:text-white hover:bg-[#323948]"}`}
-                                                                    >
-                                                                        <FileText className="h-3 w-3" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteLesson(lesson._id)}
-                                                                        className="rounded-lg bg-red-600/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-600/20"
-                                                                    >
-                                                                        <Trash2 className="h-3 w-3" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Notes panel for this lesson */}
-                                                            {selectedLessonForNotes === lesson._id && (
-                                                                <div className="bg-[#181C27] px-5 py-4 space-y-3 border-b border-[#272D40]">
-                                                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                                                        Notes for &quot;{lesson.title}&quot;
-                                                                    </h4>
-
-                                                                    {/* Upload note form */}
-                                                                    <div className="flex gap-2 flex-wrap">
-                                                                        <input
-                                                                            type="text"
-                                                                            className="flex-1 min-w-[150px] rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-blue-500"
-                                                                            placeholder="Note title"
-                                                                            value={noteTitle}
-                                                                            onChange={(e) => setNoteTitle(e.target.value)}
-                                                                        />
-                                                                        <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-dashed border-[#272D40] bg-[#0F1117] px-3 py-2 text-xs text-gray-400 hover:border-blue-500/50">
-                                                                            <Upload className="h-3 w-3" />
-                                                                            {noteFile ? noteFile.name.slice(0, 15) : "File"}
-                                                                            <input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt" className="hidden" onChange={(e) => setNoteFile(e.target.files?.[0] || null)} />
-                                                                        </label>
-                                                                        <button
-                                                                            onClick={() => handleUploadNote(lesson._id)}
-                                                                            disabled={uploadingNote || !noteTitle.trim() || !noteFile}
-                                                                            className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-                                                                        >
-                                                                            {uploadingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : "Upload"}
-                                                                        </button>
-                                                                    </div>
-
-                                                                    {/* Existing notes */}
-                                                                    {loadingNotes ? (
-                                                                        <p className="text-xs text-gray-500">Loading...</p>
-                                                                    ) : notes.length === 0 ? (
-                                                                        <p className="text-xs text-gray-500">No notes for this lesson.</p>
-                                                                    ) : (
-                                                                        <div className="space-y-1.5">
-                                                                            {notes.map((note) => (
-                                                                                <div key={note._id} className="flex items-center justify-between rounded-lg bg-[#0F1117] px-3 py-2">
-                                                                                    <div className="flex items-center gap-2 min-w-0">
-                                                                                        <FileText className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                                                                                        <span className="text-xs text-white truncate">{note.title}</span>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                                                                                        <button
-                                                                                            className="rounded bg-[#272D40] p-1.5 text-gray-400 hover:text-white"
-                                                                                            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/notes/${note._id}/download`, "_blank")}
-                                                                                        >
-                                                                                            <Download className="h-3 w-3" />
-                                                                                        </button>
-                                                                                        <button onClick={() => handleDeleteNote(note._id)} className="rounded bg-red-600/10 p-1.5 text-red-400 hover:bg-red-600/20">
-                                                                                            <Trash2 className="h-3 w-3" />
-                                                                                        </button>
-                                                                                    </div>
+                                            {/* Expanded Content */}
+                                            {isExpanded && (
+                                                <div className="border-t border-[#272D40] bg-[#0F1117]">
+                                                    {/* Lessons */}
+                                                    {section.lessons.length > 0 && (
+                                                        <div>
+                                                            {section.lessons.map((lesson, idx) => (
+                                                                <div key={lesson._id}>
+                                                                    <div className="flex items-center justify-between px-5 py-3 border-b border-[#272D40]">
+                                                                        <div className="flex items-center gap-3 min-w-0">
+                                                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#272D40] text-xs font-semibold text-gray-400">
+                                                                                {idx + 1}
+                                                                            </span>
+                                                                            <div className="min-w-0">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <p className="text-sm font-medium text-white truncate">{lesson.title}</p>
+                                                                                    {liveStatusBadge(lesson)}
                                                                                 </div>
-                                                                            ))}
+                                                                                {lesson.description && <p className="text-xs text-gray-500 truncate">{lesson.description}</p>}
+                                                                                {/* Live info row */}
+                                                                                {lesson.isLiveEnabled && lesson.liveStartAt && (
+                                                                                    <p className="mt-0.5 text-xs text-gray-500 flex items-center gap-1">
+                                                                                        <Clock className="h-3 w-3" />
+                                                                                        {new Date(lesson.liveStartAt).toLocaleString()}
+                                                                                        {lesson.livePlatform && (
+                                                                                            <span className="ml-1 text-gray-600">• {lesson.livePlatform}</span>
+                                                                                        )}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 ml-4 shrink-0 flex-wrap justify-end">
+                                                                            {/* Live status controls */}
+                                                                            {lesson.isLiveEnabled && !lesson.videoUrl && (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    {lesson.liveStatus === "scheduled" && (
+                                                                                        <button
+                                                                                            onClick={() => handleUpdateLiveStatus(lesson._id, "live")}
+                                                                                            className="rounded-lg bg-red-600/10 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 hover:bg-red-600/20 uppercase tracking-wider"
+                                                                                        >
+                                                                                            Go Live
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {lesson.liveStatus === "live" && (
+                                                                                        <button
+                                                                                            onClick={() => handleUpdateLiveStatus(lesson._id, "ended")}
+                                                                                            className="rounded-lg bg-gray-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-gray-400 hover:bg-gray-500/20 uppercase tracking-wider"
+                                                                                        >
+                                                                                            End
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {/* Upload recording button */}
+                                                                                    <button
+                                                                                        onClick={() => setUploadRecordingForLesson(
+                                                                                            uploadRecordingForLesson === lesson._id ? null : lesson._id
+                                                                                        )}
+                                                                                        className="rounded-lg bg-blue-600/10 px-2.5 py-1.5 text-[10px] font-semibold text-blue-400 hover:bg-blue-600/20 uppercase tracking-wider"
+                                                                                    >
+                                                                                        <Upload className="h-3 w-3 inline mr-0.5" />
+                                                                                        Recording
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
+                                                                            {lesson.isLiveEnabled && lesson.liveJoinUrl && (
+                                                                                <a
+                                                                                    href={lesson.liveJoinUrl}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="rounded-lg bg-[#272D40] p-2 text-gray-400 hover:text-white hover:bg-[#323948]"
+                                                                                >
+                                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                                </a>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={() => toggleNotesForLesson(lesson._id)}
+                                                                                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${selectedLessonForNotes === lesson._id ? "bg-blue-600 text-white" : "bg-[#272D40] text-gray-400 hover:text-white hover:bg-[#323948]"}`}
+                                                                            >
+                                                                                <FileText className="h-3 w-3" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteLesson(lesson._id)}
+                                                                                className="rounded-lg bg-red-600/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-600/20"
+                                                                            >
+                                                                                <Trash2 className="h-3 w-3" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Upload recording panel */}
+                                                                    {uploadRecordingForLesson === lesson._id && (
+                                                                        <div className="bg-[#181C27] px-5 py-4 space-y-3 border-b border-[#272D40]">
+                                                                            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                                                                Upload Recording for &quot;{lesson.title}&quot;
+                                                                            </h4>
+                                                                            <div className="flex gap-2 items-center flex-wrap">
+                                                                                <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-[#272D40] bg-[#0F1117] px-4 py-3 text-xs text-gray-400 transition-colors hover:border-blue-500/50 flex-1 min-w-[200px]">
+                                                                                    <Upload className="h-4 w-4" />
+                                                                                    {recordingFile ? recordingFile.name : "Choose video file"}
+                                                                                    <input type="file" accept="video/*" className="hidden" onChange={(e) => setRecordingFile(e.target.files?.[0] || null)} />
+                                                                                </label>
+                                                                                <button
+                                                                                    onClick={() => handleUploadRecording(lesson._id)}
+                                                                                    disabled={uploadingRecording || !recordingFile}
+                                                                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                                                                >
+                                                                                    {uploadingRecording ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                                                                    Upload
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => { setUploadRecordingForLesson(null); setRecordingFile(null) }}
+                                                                                    className="rounded-lg bg-[#272D40] px-3 py-2.5 text-xs font-medium text-white hover:bg-[#323948]"
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Notes panel for this lesson */}
+                                                                    {selectedLessonForNotes === lesson._id && (
+                                                                        <div className="bg-[#181C27] px-5 py-4 space-y-3 border-b border-[#272D40]">
+                                                                            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                                                                Notes for &quot;{lesson.title}&quot;
+                                                                            </h4>
+
+                                                                            {/* Upload note form */}
+                                                                            <div className="flex gap-2 flex-wrap">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="flex-1 min-w-[150px] rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-blue-500"
+                                                                                    placeholder="Note title"
+                                                                                    value={noteTitle}
+                                                                                    onChange={(e) => setNoteTitle(e.target.value)}
+                                                                                />
+                                                                                <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-dashed border-[#272D40] bg-[#0F1117] px-3 py-2 text-xs text-gray-400 hover:border-blue-500/50">
+                                                                                    <Upload className="h-3 w-3" />
+                                                                                    {noteFile ? noteFile.name.slice(0, 15) : "File"}
+                                                                                    <input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt" className="hidden" onChange={(e) => setNoteFile(e.target.files?.[0] || null)} />
+                                                                                </label>
+                                                                                <button
+                                                                                    onClick={() => handleUploadNote(lesson._id)}
+                                                                                    disabled={uploadingNote || !noteTitle.trim() || !noteFile}
+                                                                                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                                                                >
+                                                                                    {uploadingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : "Upload"}
+                                                                                </button>
+                                                                            </div>
+
+                                                                            {/* Existing notes */}
+                                                                            {loadingNotes ? (
+                                                                                <p className="text-xs text-gray-500">Loading...</p>
+                                                                            ) : notes.length === 0 ? (
+                                                                                <p className="text-xs text-gray-500">No notes for this lesson.</p>
+                                                                            ) : (
+                                                                                <div className="space-y-1.5">
+                                                                                    {notes.map((note) => (
+                                                                                        <div key={note._id} className="flex items-center justify-between rounded-lg bg-[#0F1117] px-3 py-2">
+                                                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                                                <FileText className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                                                                                <span className="text-xs text-white truncate">{note.title}</span>
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                                                                                                <button
+                                                                                                    className="rounded bg-[#272D40] p-1.5 text-gray-400 hover:text-white"
+                                                                                                    onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/notes/${note._id}/download`, "_blank")}
+                                                                                                >
+                                                                                                    <Download className="h-3 w-3" />
+                                                                                                </button>
+                                                                                                <button onClick={() => handleDeleteNote(note._id)} className="rounded bg-red-600/10 p-1.5 text-red-400 hover:bg-red-600/20">
+                                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                            )}
+                                                            ))}
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                                    )}
 
-                                            {/* Add Lesson Form */}
-                                            {addLessonToSection === section._id ? (
-                                                <div className="p-5 space-y-3">
-                                                    <h4 className="text-sm font-medium text-gray-300">Add Lesson</h4>
-                                                    <input
-                                                        type="text"
-                                                        required
-                                                        className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
-                                                        placeholder="Lesson title"
-                                                        value={lessonTitle}
-                                                        onChange={(e) => setLessonTitle(e.target.value)}
-                                                    />
-                                                    <textarea
-                                                        rows={2}
-                                                        className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 resize-none"
-                                                        placeholder="Description (optional)"
-                                                        value={lessonDescription}
-                                                        onChange={(e) => setLessonDescription(e.target.value)}
-                                                    />
-                                                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#272D40] bg-[#0F1117] px-4 py-6 text-sm text-gray-400 transition-colors hover:border-blue-500/50">
-                                                        <Upload className="h-5 w-5" />
-                                                        {lessonVideo ? lessonVideo.name : "Click to upload video file"}
-                                                        <input type="file" accept="video/*" className="hidden" onChange={(e) => setLessonVideo(e.target.files?.[0] || null)} />
-                                                    </label>
-                                                    <div className="flex gap-2">
+                                                    {/* Add Lesson Form */}
+                                                    {addLessonToSection === section._id ? (
+                                                        <div className="p-5 space-y-4">
+                                                            <h4 className="text-sm font-medium text-gray-300">Add Lesson</h4>
+
+                                                            {/* Toggle: Recorded vs Live */}
+                                                            <div className="flex items-center gap-3">
+                                                                <button
+                                                                    onClick={() => setIsLiveMode(false)}
+                                                                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${!isLiveMode
+                                                                        ? "bg-blue-600 text-white"
+                                                                        : "bg-[#272D40] text-gray-400 hover:text-white"
+                                                                        }`}
+                                                                >
+                                                                    <VideoIcon className="h-4 w-4" />
+                                                                    Recorded
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setIsLiveMode(true)}
+                                                                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${isLiveMode
+                                                                        ? "bg-red-600 text-white"
+                                                                        : "bg-[#272D40] text-gray-400 hover:text-white"
+                                                                        }`}
+                                                                >
+                                                                    <Radio className="h-4 w-4" />
+                                                                    Live Class
+                                                                </button>
+                                                            </div>
+
+                                                            <input
+                                                                type="text"
+                                                                required
+                                                                className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
+                                                                placeholder="Lesson title"
+                                                                value={lessonTitle}
+                                                                onChange={(e) => setLessonTitle(e.target.value)}
+                                                            />
+                                                            <textarea
+                                                                rows={2}
+                                                                className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 resize-none"
+                                                                placeholder="Description (optional)"
+                                                                value={lessonDescription}
+                                                                onChange={(e) => setLessonDescription(e.target.value)}
+                                                            />
+
+                                                            {isLiveMode ? (
+                                                                /* ─── Live class fields ─── */
+                                                                <div className="space-y-3 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                                                                    <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
+                                                                        Live Class Details
+                                                                    </p>
+                                                                    <div className="grid gap-3 sm:grid-cols-2">
+                                                                        <div>
+                                                                            <label className="text-xs text-gray-400 mb-1 block">Platform</label>
+                                                                            <select
+                                                                                value={livePlatform}
+                                                                                onChange={(e) => setLivePlatform(e.target.value as any)}
+                                                                                className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
+                                                                            >
+                                                                                <option value="zoom">Zoom</option>
+                                                                                <option value="youtube">YouTube Live</option>
+                                                                                <option value="other">Other</option>
+                                                                            </select>
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-xs text-gray-400 mb-1 block">Start Date & Time</label>
+                                                                            <input
+                                                                                type="datetime-local"
+                                                                                value={liveStartAt}
+                                                                                onChange={(e) => setLiveStartAt(e.target.value)}
+                                                                                className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-xs text-gray-400 mb-1 block">Join URL</label>
+                                                                        <input
+                                                                            type="url"
+                                                                            placeholder="https://zoom.us/j/123456789"
+                                                                            value={liveJoinUrl}
+                                                                            onChange={(e) => setLiveJoinUrl(e.target.value)}
+                                                                            className="w-full rounded-lg border border-[#272D40] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                /* ─── Video upload ─── */
+                                                                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#272D40] bg-[#0F1117] px-4 py-6 text-sm text-gray-400 transition-colors hover:border-blue-500/50">
+                                                                    <Upload className="h-5 w-5" />
+                                                                    {lessonVideo ? lessonVideo.name : "Click to upload video file"}
+                                                                    <input type="file" accept="video/*" className="hidden" onChange={(e) => setLessonVideo(e.target.files?.[0] || null)} />
+                                                                </label>
+                                                            )}
+
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => handleUploadLesson(section._id)}
+                                                                    disabled={uploadingLesson || !lessonTitle.trim() || (!isLiveMode && !lessonVideo) || (isLiveMode && (!liveJoinUrl.trim() || !liveStartAt))}
+                                                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                                                >
+                                                                    {uploadingLesson ? <><Loader2 className="h-4 w-4 animate-spin" />Processing...</> : isLiveMode ? "Schedule Live Class" : "Upload Lesson"}
+                                                                </button>
+                                                                <button
+                                                                    onClick={resetLessonForm}
+                                                                    className="rounded-lg bg-[#272D40] px-4 py-2 text-sm font-medium text-white hover:bg-[#323948]"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
                                                         <button
-                                                            onClick={() => handleUploadLesson(section._id)}
-                                                            disabled={uploadingLesson || !lessonTitle.trim() || !lessonVideo}
-                                                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                                            onClick={() => setAddLessonToSection(section._id)}
+                                                            className="flex w-full items-center justify-center gap-2 px-5 py-3 text-sm text-gray-400 transition-colors hover:bg-[#181C27] hover:text-blue-400"
                                                         >
-                                                            {uploadingLesson ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading...</> : "Upload Lesson"}
+                                                            <Plus className="h-4 w-4" />
+                                                            Add Lesson
                                                         </button>
-                                                        <button
-                                                            onClick={() => { setAddLessonToSection(null); setLessonTitle(""); setLessonDescription(""); setLessonVideo(null) }}
-                                                            className="rounded-lg bg-[#272D40] px-4 py-2 text-sm font-medium text-white hover:bg-[#323948]"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setAddLessonToSection(section._id)}
-                                                    className="flex w-full items-center justify-center gap-2 px-5 py-3 text-sm text-gray-400 transition-colors hover:bg-[#181C27] hover:text-blue-400"
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                    Add Lesson
-                                                </button>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-                            )
-                        })}
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* ─── Students Tab ───────────────────────────────── */}
+                {activeManageTab === "students" && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Users className="h-5 w-5 text-blue-400" />
+                                Enrolled Students
+                                <span className="text-sm font-normal text-gray-400">({batchStudents.filter(s => s.status === "approved").length})</span>
+                            </h2>
+                        </div>
+
+                        {/* Search */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder="Search students..."
+                                value={studentSearch}
+                                onChange={(e) => setStudentSearch(e.target.value)}
+                                className="w-full rounded-lg border border-[#272D40] bg-[#181C27] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50 transition-colors"
+                            />
+                        </div>
+
+                        {loadingStudents ? (
+                            <div className="flex items-center justify-center py-12">
+                                <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                            </div>
+                        ) : batchStudents.length === 0 ? (
+                            <div className="rounded-xl border border-[#272D40] bg-[#181C27] p-8 text-center">
+                                <Users className="mx-auto mb-3 h-10 w-10 text-gray-600" />
+                                <p className="text-gray-400">No students enrolled in this batch yet.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {batchStudents
+                                    .filter((s) =>
+                                        s.student.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                                        s.student.email.toLowerCase().includes(studentSearch.toLowerCase())
+                                    )
+                                    .map((item) => (
+                                        <div key={item.enrollmentId} className="flex items-center justify-between rounded-xl border border-[#272D40] bg-[#181C27] p-4 transition-all hover:border-[#3a4257]">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-bold text-white">
+                                                    {item.student.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-medium text-white">{item.student.name}</p>
+                                                        {item.status === "approved" ? (
+                                                            <span className="rounded-full bg-green-500/10 border border-green-500/20 px-2 py-0.5 text-[10px] font-medium text-green-400">Enrolled</span>
+                                                        ) : item.status === "pending" ? (
+                                                            <span className="rounded-full bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 text-[10px] font-medium text-yellow-400">Pending</span>
+                                                        ) : (
+                                                            <span className="rounded-full bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-[10px] font-medium text-red-400">Rejected</span>
+                                                        )}
+                                                    </div>
+                                                    <span className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+                                                        <Mail className="h-3 w-3" />{item.student.email}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Link
+                                                    href="/dashboard/students"
+                                                    className="rounded-lg bg-[#0F1117] border border-[#272D40] px-3 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-white hover:border-[#3a4257]"
+                                                >
+                                                    Manage
+                                                </Link>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!window.confirm(`Remove ${item.student.name} from this batch?`)) return
+                                                        try {
+                                                            setError(null); setMessage(null)
+                                                            await api.delete(`/students/${item.student._id}/batches/${batchId}`)
+                                                            setBatchStudents((prev) => prev.filter((s) => s.enrollmentId !== item.enrollmentId))
+                                                            setMessage("Student removed from batch.")
+                                                        } catch (err: any) {
+                                                            setError(err?.response?.data?.message || "Failed to remove student.")
+                                                        }
+                                                    }}
+                                                    className="flex items-center gap-1 rounded-lg bg-red-600/10 px-2.5 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-600/20"
+                                                >
+                                                    <X className="h-3 w-3" />Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
                     </div>
                 )}
+
             </main>
         </div>
     )

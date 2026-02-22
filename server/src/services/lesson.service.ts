@@ -34,6 +34,41 @@ export async function createLesson(data: {
     })
 }
 
+/**
+ * Create a live-class lesson (no video upload required at creation time).
+ */
+export async function createLiveLesson(data: {
+    title: string
+    description?: string
+    sectionId: string
+    livePlatform: "zoom" | "youtube" | "other"
+    liveJoinUrl: string
+    liveStartAt: string | Date
+    order?: number
+}) {
+    const sectionObjId = new mongoose.Types.ObjectId(data.sectionId)
+    const section = await Section.findById(sectionObjId)
+    if (!section) throw new Error("Section not found")
+
+    let order = data.order
+    if (typeof order !== "number") {
+        const count = await Lesson.countDocuments({ section: sectionObjId })
+        order = count
+    }
+
+    return await Lesson.create({
+        title: data.title,
+        description: data.description || "",
+        section: sectionObjId,
+        isLiveEnabled: true,
+        livePlatform: data.livePlatform,
+        liveJoinUrl: data.liveJoinUrl,
+        liveStartAt: new Date(data.liveStartAt),
+        liveStatus: "scheduled",
+        order,
+    })
+}
+
 export async function getLessonsBySection(sectionId: string) {
     return await Lesson.find({ section: sectionId }).sort({ order: 1 })
 }
@@ -43,6 +78,11 @@ export async function updateLesson(lessonId: string, updates: {
     description?: string
     order?: number
     duration?: number
+    isLiveEnabled?: boolean
+    livePlatform?: "zoom" | "youtube" | "other"
+    liveJoinUrl?: string
+    liveStartAt?: string | Date
+    liveStatus?: "scheduled" | "live" | "ended"
 }) {
     const lesson = await Lesson.findById(lessonId)
     if (!lesson) throw new Error("Lesson not found")
@@ -58,6 +98,44 @@ export async function updateLesson(lessonId: string, updates: {
     }
     if (typeof updates.duration === "number") {
         lesson.duration = updates.duration
+    }
+
+    // Live fields
+    if (typeof updates.isLiveEnabled === "boolean") {
+        lesson.isLiveEnabled = updates.isLiveEnabled
+    }
+    if (updates.livePlatform) {
+        lesson.livePlatform = updates.livePlatform
+    }
+    if (typeof updates.liveJoinUrl === "string") {
+        lesson.liveJoinUrl = updates.liveJoinUrl
+    }
+    if (updates.liveStartAt) {
+        lesson.liveStartAt = new Date(updates.liveStartAt)
+    }
+    if (updates.liveStatus) {
+        lesson.liveStatus = updates.liveStatus
+    }
+
+    return await lesson.save()
+}
+
+/**
+ * Upload recording to an existing live lesson — sets videoUrl + publicId so the
+ * lesson transitions from "live only" to "has recording".
+ */
+export async function uploadRecording(lessonId: string, videoUrl: string, publicId: string, duration?: number) {
+    const lesson = await Lesson.findById(lessonId)
+    if (!lesson) throw new Error("Lesson not found")
+
+    lesson.videoUrl = videoUrl
+    lesson.publicId = publicId
+    if (typeof duration === "number") {
+        lesson.duration = duration
+    }
+    // Mark live as ended since recording is now available
+    if (lesson.isLiveEnabled && lesson.liveStatus !== "ended") {
+        lesson.liveStatus = "ended"
     }
 
     return await lesson.save()
