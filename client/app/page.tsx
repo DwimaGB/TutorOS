@@ -14,7 +14,7 @@ interface User {
   role: "student" | "admin"
 }
 
-export default function TeachHubLanding() {
+export default function TeachOSLanding() {
   const router = useRouter()
   const [year, setYear] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -55,7 +55,7 @@ export default function TeachHubLanding() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-            <span className="font-semibold">TeachHub</span>
+            <span className="font-semibold">TeachOS</span>
           </div>
 
           <div className="flex gap-3">
@@ -76,14 +76,14 @@ export default function TeachHubLanding() {
           transition={{ duration: 0.6 }}
           className="text-4xl md:text-5xl font-bold leading-tight"
         >
-          Manage Your Classes, Courses,
+          Your Personal Tuition Portal
           <br className="hidden md:block" />
-          and Students in One Place
+          for Classes, Lessons, and Students
         </motion.h1>
 
         <p className="mt-6 mx-auto max-w-2xl text-lg text-gray-400">
-          Organize lessons, upload notes, and manage your teaching workflow
-          from a simple and powerful dashboard.
+          Organize your tuition batches, lessons, and notes in one place and
+          give students a simple portal to access everything.
         </p>
 
         {/* Buttons */}
@@ -136,7 +136,7 @@ export default function TeachHubLanding() {
       {/* Features */}
       <section className="mx-auto max-w-6xl px-6 py-16">
         <h2 className="text-center text-3xl font-semibold">
-          Everything You Need to Manage Teaching
+          Everything You Need to Run Your Tuition Classes
         </h2>
 
         <div className="mt-12 grid gap-6 md:grid-cols-4">
@@ -156,7 +156,7 @@ export default function TeachHubLanding() {
                 <h3 className="font-semibold text-white">{feature}</h3>
 
                 <p className="mt-2 text-sm text-gray-400">
-                  Manage and organize your teaching workflow efficiently.
+                  Manage and organize your tuition classes, content, and students efficiently.
                 </p>
               </CardContent>
             </Card>
@@ -166,7 +166,7 @@ export default function TeachHubLanding() {
 
       {/* Footer */}
       <footer className="border-t border-[#272D40] py-8 text-center text-sm text-gray-400">
-        © {year || new Date().getFullYear()} TeachHub. All rights reserved.
+        © {year || new Date().getFullYear()} TeachOS. All rights reserved.
       </footer>
     </div>
   )
