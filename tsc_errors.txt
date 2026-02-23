@@ -1,4 +1,0 @@
-src/controllers/lesson.controller.ts(71,43): error TS2379: Argument of type '{ title: any; description: any; sectionId: string; livePlatform: any; liveJoinUrl: string; liveStartAt: any; order: number | undefined; }' is not assignable to parameter of type '{ title: string; description?: string; sectionId: string; livePlatform: "zoom" | "youtube" | "other"; liveJoinUrl: string; liveStartAt: string | Date; order?: number; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
-  Types of property 'order' are incompatible.
-    Type 'number | undefined' is not assignable to type 'number'.
-      Type 'undefined' is not assignable to type 'number'.
