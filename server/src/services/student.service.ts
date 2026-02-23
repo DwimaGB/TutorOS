@@ -1,11 +1,11 @@
 import User from "../models/user.model.js"
 import Enrollment from "../models/enrollment.model.js"
+import Notification from "../models/notification.model.js"
 import mongoose from "mongoose"
 
 export async function getAllStudents() {
     const students = await User.find({ role: "student" }).select("-password").sort({ createdAt: -1 }).lean()
 
-    // Get approved enrollment counts for all students in one query
     const enrollmentCounts = await Enrollment.aggregate([
         { $match: { status: "approved" } },
         { $group: { _id: "$user", count: { $sum: 1 } } },
@@ -38,9 +38,15 @@ export async function removeStudentFromBatch(studentId: string, batchId: string)
     return deleted
 }
 
-/**
- * Admin directly enrolls a student in a batch with "approved" status.
- */
+export async function deleteStudent(studentId: string) {
+    const student = await User.findById(studentId)
+    if (!student || student.role !== "student") throw new Error("Student not found")
+
+    await Enrollment.deleteMany({ user: studentId })
+    await Notification.deleteMany({ user: studentId })
+    await User.findByIdAndDelete(studentId)
+}
+
 export async function adminEnrollStudent(studentId: string, batchId: string) {
     const userId = new mongoose.Types.ObjectId(studentId)
     const batchObjId = new mongoose.Types.ObjectId(batchId)
@@ -51,7 +57,6 @@ export async function adminEnrollStudent(studentId: string, batchId: string) {
     const existing = await Enrollment.findOne({ user: userId, batch: batchObjId })
     if (existing) {
         if (existing.status === "approved") throw new Error("Student already enrolled")
-        // If pending or rejected, upgrade to approved
         existing.status = "approved"
         return await existing.save()
     }
@@ -59,9 +64,6 @@ export async function adminEnrollStudent(studentId: string, batchId: string) {
     return await Enrollment.create({ user: userId, batch: batchObjId, status: "approved" })
 }
 
-/**
- * Get students enrolled in a specific batch (with enrollment status).
- */
 export async function getStudentsByBatch(batchId: string) {
     const enrollments = await Enrollment.find({ batch: batchId })
         .populate("user", "name email createdAt")

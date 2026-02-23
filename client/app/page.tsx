@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 
 interface User {
   _id: string
@@ -14,14 +14,10 @@ interface User {
   role: "student" | "admin"
 }
 
-export default function TeachOSLanding() {
+export default function TutorOSLanding() {
   const router = useRouter()
-  const [year, setYear] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setYear(new Date().getFullYear())
-
     const storedUser = localStorage.getItem("user")
     const token = localStorage.getItem("token")
 
@@ -33,20 +29,9 @@ export default function TeachOSLanding() {
         }
       } catch (err) {
         console.error("Error parsing user data:", err)
-        setIsLoading(false)
       }
-    } else {
-      setIsLoading(false)
     }
   }, [router])
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0F1117]">
-        <p className="text-white">Loading...</p>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-[#0F1117] text-white">
@@ -55,7 +40,7 @@ export default function TeachOSLanding() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-            <span className="font-semibold">TeachOS</span>
+            <span className="font-semibold">TutorOS</span>
           </div>
 
           <div className="flex gap-3">
@@ -166,7 +151,7 @@ export default function TeachOSLanding() {
 
       {/* Footer */}
       <footer className="border-t border-[#272D40] py-8 text-center text-sm text-gray-400">
-        © {year || new Date().getFullYear()} TeachOS. All rights reserved.
+        © {new Date().getFullYear()} TutorOS. All rights reserved.
       </footer>
     </div>
   )

@@ -89,7 +89,7 @@ export default function DashboardLayout({
       <header className="flex items-center justify-between border-b border-[#272D40] bg-[#181C27] px-4 py-3 md:hidden">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-          <span className="text-lg font-semibold text-white">TeachOS</span>
+          <span className="text-lg font-semibold text-white">TutorOS</span>
         </div>
         <div className="flex items-center gap-2">
           {/* Mobile notification bell for students */}
@@ -169,7 +169,7 @@ export default function DashboardLayout({
       <aside className="hidden w-64 shrink-0 flex-col border-r border-[#272D40] bg-[#181C27] md:flex">
         <div className="flex items-center gap-2 px-6 py-5">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-          <span className="text-lg font-semibold text-white">TeachOS</span>
+          <span className="text-lg font-semibold text-white">TutorOS</span>
         </div>
 
         {hydrated && user && (
