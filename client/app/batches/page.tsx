@@ -48,7 +48,7 @@ export default function BatchesPage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-            <span className="font-semibold text-white">TeachOS</span>
+            <span className="font-semibold text-white">TutorOS</span>
           </div>
           <Link href="/dashboard">
             <button className="rounded-lg border border-[#272D40] px-4 py-2 text-sm text-gray-300 transition-colors hover:border-blue-500/50 hover:text-white">

@@ -14,7 +14,7 @@ interface User {
   role: "student" | "admin"
 }
 
-export default function TeachOSLanding() {
+export default function TutorOSLanding() {
   const router = useRouter()
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function TeachOSLanding() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500" />
-            <span className="font-semibold">TeachOS</span>
+            <span className="font-semibold">TutorOS</span>
           </div>
 
           <div className="flex gap-3">
@@ -151,7 +151,7 @@ export default function TeachOSLanding() {
 
       {/* Footer */}
       <footer className="border-t border-[#272D40] py-8 text-center text-sm text-gray-400">
-        © {new Date().getFullYear()} TeachOS. All rights reserved.
+        © {new Date().getFullYear()} TutorOS. All rights reserved.
       </footer>
     </div>
   )
