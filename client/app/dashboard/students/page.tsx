@@ -207,6 +207,23 @@ export default function ManageStudentsPage() {
         }
     }
 
+    const handleDeleteStudent = async (studentId: string) => {
+        if (!window.confirm("Delete this student account? This cannot be undone.")) return
+        try {
+            setError(null); setMessage(null)
+            await api.delete(`/students/${studentId}`)
+            setStudents((prev) => prev.filter((s) => s._id !== studentId))
+            if (expandedId === studentId) {
+                setExpandedId(null)
+                setDetail(null)
+            }
+            setMessage("Student account deleted.")
+        } catch (err) {
+            const axiosErr = err as AxiosError<{ message?: string }> | undefined
+            setError(axiosErr?.response?.data?.message || "Could not delete student.")
+        }
+    }
+
     const statusBadge = (status: string) => {
         switch (status) {
             case "approved":
@@ -395,16 +412,25 @@ export default function ManageStudentsPage() {
                                                         <h4 className="text-sm font-medium text-gray-300">
                                                             Batch Enrollments ({detail.enrollments.length})
                                                         </h4>
-                                                        <button
-                                                            onClick={() => {
-                                                                setEnrollModal(student._id)
-                                                                setSelectedBatch("")
-                                                            }}
-                                                            className="flex items-center gap-1.5 rounded-lg bg-blue-600/10 border border-blue-500/20 px-3 py-1.5 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-600/20"
-                                                        >
-                                                            <Plus className="h-3 w-3" />
-                                                            Enroll in Batch
-                                                        </button>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEnrollModal(student._id)
+                                                                    setSelectedBatch("")
+                                                                }}
+                                                                className="flex items-center gap-1.5 rounded-lg bg-blue-600/10 border border-blue-500/20 px-3 py-1.5 text-xs font-medium text-blue-400 transition-colors hover:bg-blue-600/20"
+                                                            >
+                                                                <Plus className="h-3 w-3" />
+                                                                Enroll in Batch
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteStudent(student._id)}
+                                                                className="flex items-center gap-1.5 rounded-lg bg-red-600/10 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-600/20"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                                Delete Account
+                                                            </button>
+                                                        </div>
                                                     </div>
 
                                                     {/* Enroll Modal */}

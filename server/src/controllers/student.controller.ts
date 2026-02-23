@@ -1,6 +1,6 @@
 import type { Response } from "express"
 import type { AuthRequest } from "../middleware/auth.middleware.js"
-import { getAllStudents, getStudentById, removeStudentFromBatch, adminEnrollStudent, getStudentsByBatch } from "../services/student.service.js"
+import { getAllStudents, getStudentById, removeStudentFromBatch, adminEnrollStudent, getStudentsByBatch, deleteStudent } from "../services/student.service.js"
 
 export const getStudentsHandler = async (_req: AuthRequest, res: Response) => {
     try {
@@ -32,6 +32,18 @@ export const removeStudentFromBatchHandler = async (req: AuthRequest, res: Respo
             return res.status(404).json({ message: error.message })
         }
         res.status(500).json({ message: "Error removing student from batch" })
+    }
+}
+
+export const deleteStudentHandler = async (req: AuthRequest, res: Response) => {
+    try {
+        await deleteStudent(req.params.studentId as string)
+        res.json({ message: "Student deleted" })
+    } catch (error: any) {
+        if (error.message === "Student not found") {
+            return res.status(404).json({ message: error.message })
+        }
+        res.status(500).json({ message: "Error deleting student" })
     }
 }
 
