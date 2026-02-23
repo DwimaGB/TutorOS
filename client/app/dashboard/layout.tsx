@@ -59,7 +59,11 @@ export default function DashboardLayout({
     return () => clearInterval(interval)
   }, [user])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout")
+    } catch {
+    }
     localStorage.removeItem("token")
     localStorage.removeItem("user")
     router.push("/login")
