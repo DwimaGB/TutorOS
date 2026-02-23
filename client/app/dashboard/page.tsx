@@ -77,6 +77,13 @@ interface ActivityItem {
   createdAt: string
 }
 
+interface AdminStatus {
+  isOnline: boolean
+  lastSeen?: string
+  name: string
+  email: string
+}
+
 /* ─── Helpers ─────────────────────────────────────────────── */
 
 function formatDuration(seconds: number): string {
@@ -106,6 +113,7 @@ export default function Dashboard() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [adminStatus, setAdminStatus] = useState<AdminStatus | null>(null)
 
   // Admin analytics state
   const [overview, setOverview] = useState<OverviewStats | null>(null)
@@ -132,7 +140,6 @@ export default function Dashboard() {
 
       try {
         if (user?.role === "admin") {
-          // Fetch all analytics data + live batches in parallel
           const [overviewRes, batchesRes, activityRes, liveRes] = await Promise.all([
             api.get<OverviewStats>("/analytics/overview"),
             api.get<BatchAnalytics[]>("/analytics/batches"),
@@ -144,12 +151,14 @@ export default function Dashboard() {
           setRecentActivity(activityRes.data)
           setLiveBatchIds(new Set(liveRes.data.liveBatchIds))
         } else {
-          const [enrollRes, liveRes] = await Promise.all([
+          const [enrollRes, liveRes, adminRes] = await Promise.all([
             api.get<Enrollment[]>("/enrollment/my"),
             api.get<{ liveBatchIds: string[] }>("/notifications/live-batches"),
+            api.get<AdminStatus>("/auth/admin-status"),
           ])
           setEnrollments(enrollRes.data)
           setLiveBatchIds(new Set(liveRes.data.liveBatchIds))
+          setAdminStatus(adminRes.data)
         }
       } catch (err: unknown) {
         console.error(err)
@@ -479,6 +488,34 @@ export default function Dashboard() {
                 {user.role}
               </span>
             </p>
+          )}
+          {adminStatus && (
+            <div className="mt-3 flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
+                  adminStatus.isOnline
+                    ? "bg-green-500/10 text-green-400 border-green-500/30"
+                    : "bg-gray-500/10 text-gray-400 border-gray-500/30"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    adminStatus.isOnline ? "bg-green-400" : "bg-gray-500"
+                  }`}
+                />
+                Teacher {adminStatus.isOnline ? "Online" : "Offline"}
+              </span>
+              {!adminStatus.isOnline && adminStatus.lastSeen && (
+                <span className="text-xs text-gray-500">
+                  Last seen{" "}
+                  {new Date(adminStatus.lastSeen).toLocaleDateString()}{" "}
+                  {new Date(adminStatus.lastSeen).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </section>

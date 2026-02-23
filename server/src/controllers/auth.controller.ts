@@ -56,3 +56,25 @@ export const logout = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Server error" })
   }
 }
+
+export const getAdminStatus = async (_req: AuthRequest, res: Response) => {
+  try {
+    const admin = await User.findOne({ role: "admin" }).select("name email lastSeen")
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" })
+    }
+
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    const isOnline = admin.lastSeen ? new Date(admin.lastSeen) > fiveMinutesAgo : false
+
+    res.json({
+      isOnline,
+      lastSeen: admin.lastSeen,
+      name: admin.name,
+      email: admin.email,
+    })
+  } catch (error) {
+    res.status(500).json({ message: "Server error" })
+  }
+}
