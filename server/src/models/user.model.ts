@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
     },
     role: {
       type: String,
@@ -48,6 +48,7 @@ userSchema.pre<IUser>("save", async function () {
 })
 
 userSchema.methods.comparePassword = function (password: string) {
+  if (!this.password) return Promise.resolve(false)
   return bcrypt.compare(password, this.password)
 }
 

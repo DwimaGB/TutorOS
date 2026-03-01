@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "Simple teaching platform demo",
 }
 
+import GoogleProvider from "@/components/GoogleProvider"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900`}
       >
-        <main className="min-h-screen">{children}</main>
+        <GoogleProvider>
+          <main className="min-h-screen">{children}</main>
+        </GoogleProvider>
       </body>
     </html>
   )
