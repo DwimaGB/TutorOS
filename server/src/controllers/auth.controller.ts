@@ -40,6 +40,31 @@ export const login = async (req: Request, res: Response) => {
   }
 }
 
+import { googleSignIn } from "../services/auth.service.js"
+
+export const googleLogin = async (req: Request, res: Response) => {
+  try {
+    const { credential } = req.body
+
+    if (!credential) {
+      return res.status(400).json({ message: "Credential is required" })
+    }
+
+    const result = await googleSignIn(credential)
+    if (!result) {
+      return res.status(400).json({ message: "Google Authentication failed" })
+    }
+
+    res.json({
+      token: generateToken(result._id.toString()),
+      user: result.user,
+    })
+  } catch (error) {
+    res.status(500).json({ message: "Server error during Google Auth" })
+  }
+}
+
+
 export const logout = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user?._id) {

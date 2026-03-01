@@ -1,0 +1,14 @@
+﻿src/services/auth.service.ts(10,36): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '{ name: string; email: string; password: string | undefined; role: string; }' is not assignable to parameter of type '{ name?: StringQueryTypeCasting; email?: StringQueryTypeCasting; password?: StringQueryTypeCasting; role?: StringQueryTypeCasting; ... 61 more ...; validateSync?: { ...; } | {}; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+      Types of property 'password' are incompatible.
+        Type 'string | undefined' is not assignable to type 'StringQueryTypeCasting'.
+          Type 'undefined' is not assignable to type 'StringQueryTypeCasting'.
+src/services/auth.service.ts(11,49): error TS2339: Property 'toObject' does not exist on type 'never'.
+src/services/auth.service.ts(12,40): error TS2339: Property '_id' does not exist on type 'never'.
+src/services/auth.service.ts(29,47): error TS2379: Argument of type '{ idToken: string; audience: string | undefined; }' is not assignable to parameter of type 'VerifyIdTokenOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'audience' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string | string[]'.
+      Type 'undefined' is not assignable to type 'string | string[]'.
+src/services/auth.service.ts(34,28): error TS2339: Property 'getPayload' does not exist on type 'Promise<LoginTicket> & void'.
+src/services/auth.service.ts(48,12): error TS2790: The operand of a 'delete' operator must be optional.

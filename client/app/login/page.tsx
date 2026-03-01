@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { GoogleLogin } from "@react-oauth/google"
 import Link from "next/link"
 import { api } from "@/lib/api"
 import { useRouter } from "next/navigation"
@@ -106,7 +107,37 @@ export default function LoginPage() {
             >
               {submitting ? "Signing in..." : "Sign in"}
             </button>
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-[#272D40]"></div>
+              <span className="flex-shrink-0 px-4 text-xs text-gray-400">OR</span>
+              <div className="flex-grow border-t border-[#272D40]"></div>
+            </div>
           </form>
+
+          <div className="mt-4 flex justify-center w-full [&>div]:w-full [&>div>div]:w-full">
+            <GoogleLogin
+              onSuccess={async (credentialResponse: any) => {
+                if (!credentialResponse.credential) return
+                try {
+                  const res = await api.post("/auth/google-login", {
+                    credential: credentialResponse.credential,
+                  })
+
+                  localStorage.setItem("token", res.data.token)
+                  localStorage.setItem("user", JSON.stringify(res.data.user))
+
+                  router.push("/dashboard")
+                } catch (err) {
+                  console.error(err)
+                  setError("Google sign in failed. Please try again.")
+                }
+              }}
+              onError={() => setError("Google Sign In failed.")}
+              theme="filled_black"
+              size="large"
+              width="100%"
+            />
+          </div>
 
           <p className="mt-6 text-center text-sm text-gray-400">
             Don&apos;t have an account?{" "}
